@@ -1,0 +1,6 @@
+{
+  "name": "Contact Manager",
+  "description": "Create, search, and organize contacts by name, phone number, and location.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
