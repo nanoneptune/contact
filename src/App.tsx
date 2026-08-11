@@ -12,10 +12,11 @@ import {
   Contact as ContactIcon,
 } from 'lucide-react';
 import { Contact } from './types';
-import { loadContacts, saveContacts, getAvatarColor, getInitials } from './utils/storage';
+import { getAvatarColor, getInitials } from './utils/storage';
+import { supabase } from './lib/supabase';
 
 export default function App() {
-  const [contacts, setContacts] = useState<Contact[]>(loadContacts);
+  const [contacts, setContacts] = useState<Contact[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
 
   // Form states
@@ -27,21 +28,40 @@ export default function App() {
   // Search state
   const [searchQuery, setSearchQuery] = useState('');
 
-  // Form validation errors
+  // Form & Supabase error messages
   const [formError, setFormError] = useState('');
 
-  // Fetch contacts from server
+  // Fetch contacts directly from Supabase
   const fetchContacts = async () => {
     try {
       setLoading(true);
-      const res = await fetch('/api/contacts');
-      if (res.ok) {
-        const result = await res.json();
-        setContacts(result.contacts || []);
-        saveContacts(result.contacts || []);
+      setFormError('');
+
+      const { data, error } = await supabase
+        .from('contacts')
+        .select('*');
+
+      if (error) {
+        console.error('Supabase fetch error:', error);
+        setFormError(`Supabase Connection Error: ${error.message}`);
+        setContacts([]);
+      } else if (data) {
+        const formatted: Contact[] = data
+          .map((item: any) => ({
+            id: String(item.id || ''),
+            name: String(item.name || ''),
+            phone: String(item.phone || ''),
+            place: String(item.place || ''),
+            isFavorite: Boolean(item.isFavorite ?? item.is_favorite ?? false),
+            createdAt: Number(item.createdAt ?? item.created_at ?? Date.now()),
+          }))
+          .sort((a, b) => b.createdAt - a.createdAt);
+
+        setContacts(formatted);
       }
     } catch (err: any) {
-      console.warn('Backend API fetch notice:', err);
+      console.error('Supabase fetch exception:', err);
+      setFormError(`Failed to connect to Supabase: ${err?.message || 'Network error'}`);
     } finally {
       setLoading(false);
     }
@@ -61,72 +81,65 @@ export default function App() {
     setFormError('');
 
     if (editingId) {
-      // Edit mode
-      const updatedData = { name: name.trim(), phone: phone.trim(), place: place.trim() };
-      
-      const updatedList = contacts.map((c) =>
-        c.id === editingId ? { ...c, ...updatedData } : c
-      );
-      setContacts(updatedList);
-      saveContacts(updatedList);
+      // Edit mode in Supabase
+      const updatedFields = {
+        name: name.trim(),
+        phone: phone.trim(),
+        place: place.trim(),
+      };
 
-      try {
-        await fetch(`/api/contacts/${editingId}`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(updatedData),
-        });
-      } catch (err) {
-        console.error('Failed to update contact via API:', err);
+      const { error } = await supabase
+        .from('contacts')
+        .update(updatedFields)
+        .eq('id', editingId);
+
+      if (error) {
+        console.error('Supabase update error:', error);
+        setFormError(`Failed to update in Supabase: ${error.message}`);
+        return;
       }
+
+      setContacts((prev) =>
+        prev.map((c) => (c.id === editingId ? { ...c, ...updatedFields } : c))
+      );
 
       setEditingId(null);
+      setName('');
+      setPhone('');
+      setPlace('');
     } else {
-      // Create mode
-      const newContactData = { name: name.trim(), phone: phone.trim(), place: place.trim() };
+      // Create mode in Supabase
+      const newContact: Contact = {
+        id: `contact-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+        name: name.trim(),
+        phone: phone.trim(),
+        place: place.trim(),
+        isFavorite: false,
+        createdAt: Date.now(),
+      };
 
-      try {
-        const res = await fetch('/api/contacts', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(newContactData),
-        });
-
-        if (res.ok) {
-          const result = await res.json();
-          const createdContact = result.contact || result;
-          const newList = [createdContact, ...contacts];
-          setContacts(newList);
-          saveContacts(newList);
-        } else {
-          // Local fallback
-          const localContact: Contact = {
-            id: `contact-${Date.now()}`,
-            ...newContactData,
-            isFavorite: false,
-            createdAt: Date.now(),
-          };
-          const newList = [localContact, ...contacts];
-          setContacts(newList);
-          saveContacts(newList);
-        }
-      } catch (err) {
-        console.error('Failed to create contact via API:', err);
-        const localContact: Contact = {
-          id: `contact-${Date.now()}`,
-          ...newContactData,
+      const { error } = await supabase.from('contacts').insert([
+        {
+          id: newContact.id,
+          name: newContact.name,
+          phone: newContact.phone,
+          place: newContact.place,
           isFavorite: false,
-          createdAt: Date.now(),
-        };
-        const newList = [localContact, ...contacts];
-        setContacts(newList);
-        saveContacts(newList);
-      }
-    }
+          createdAt: newContact.createdAt,
+        },
+      ]);
 
-    setName('');
-    setPhone('');
-    setPlace('');
+      if (error) {
+        console.error('Supabase insert error:', error);
+        setFormError(`Failed to save to Supabase: ${error.message}`);
+        return;
+      }
+
+      setContacts((prev) => [newContact, ...prev]);
+      setName('');
+      setPhone('');
+      setPlace('');
+    }
   };
 
   const handleEdit = (contact: Contact) => {
@@ -146,20 +159,23 @@ export default function App() {
   };
 
   const handleDelete = async (id: string) => {
-    const updatedList = contacts.filter((c) => c.id !== id);
-    setContacts(updatedList);
-    saveContacts(updatedList);
+    setFormError('');
+
+    const { error } = await supabase
+      .from('contacts')
+      .delete()
+      .eq('id', id);
+
+    if (error) {
+      console.error('Supabase delete error:', error);
+      setFormError(`Failed to delete from Supabase: ${error.message}`);
+      return;
+    }
+
+    setContacts((prev) => prev.filter((c) => c.id !== id));
 
     if (editingId === id) {
       handleCancelEdit();
-    }
-
-    try {
-      await fetch(`/api/contacts/${id}`, {
-        method: 'DELETE',
-      });
-    } catch (err) {
-      console.error('Failed to delete contact via API:', err);
     }
   };
 
@@ -177,14 +193,14 @@ export default function App() {
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 font-sans antialiased py-8 px-4 sm:px-6">
       <div className="max-w-3xl mx-auto space-y-6">
         
-        {/* Simple Page Header */}
+        {/* Page Header */}
         <div className="text-center">
           <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-slate-100">
             Contacts
           </h1>
         </div>
 
-        {/* Clean Create / Edit Contact Form */}
+        {/* Create / Edit Contact Form */}
         <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-6 shadow-xs">
           <h2 className="text-sm font-semibold text-slate-800 dark:text-slate-200 mb-4 flex items-center justify-between">
             <span className="flex items-center gap-2">
@@ -315,7 +331,7 @@ export default function App() {
           {/* Contact List View */}
           {loading ? (
             <div className="p-8 text-center bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl text-xs text-slate-400">
-              Loading contacts...
+              Loading contacts from Supabase...
             </div>
           ) : filteredContacts.length > 0 ? (
             <div className="space-y-2">
@@ -376,7 +392,7 @@ export default function App() {
             <div className="p-8 text-center bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl">
               <ContactIcon className="w-8 h-8 text-slate-300 dark:text-slate-600 mx-auto mb-2" />
               <p className="text-xs font-medium text-slate-500 dark:text-slate-400">
-                {searchQuery ? 'No contacts match your search.' : 'No contacts yet. Fill the form above to create one.'}
+                {searchQuery ? 'No contacts match your search.' : 'No contacts found in Supabase. Create your first contact above.'}
               </p>
             </div>
           )}
