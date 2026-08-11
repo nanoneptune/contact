@@ -36,14 +36,12 @@ export default function App() {
       setLoading(true);
       const res = await fetch('/api/contacts');
       if (res.ok) {
-        const data = await res.json();
-        if (Array.isArray(data)) {
-          setContacts(data);
-          saveContacts(data);
-        }
+        const result = await res.json();
+        setContacts(result.contacts || []);
+        saveContacts(result.contacts || []);
       }
-    } catch (err) {
-      console.warn('Backend API fetch notice, using local storage:', err);
+    } catch (err: any) {
+      console.warn('Backend API fetch notice:', err);
     } finally {
       setLoading(false);
     }
@@ -95,7 +93,8 @@ export default function App() {
         });
 
         if (res.ok) {
-          const createdContact = await res.json();
+          const result = await res.json();
+          const createdContact = result.contact || result;
           const newList = [createdContact, ...contacts];
           setContacts(newList);
           saveContacts(newList);

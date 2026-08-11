@@ -7,6 +7,12 @@ import {
   updateContactDB,
   deleteContactDB,
 } from "./src/db/sqlite";
+import {
+  fetchContactsSupabase,
+  addContactSupabase,
+  updateContactSupabase,
+  deleteContactSupabase,
+} from "./src/db/supabaseStore";
 
 async function startServer() {
   const app = express();
@@ -14,14 +20,44 @@ async function startServer() {
 
   app.use(express.json());
 
-  // API REST Routes for SQLite Operations
+  // Supabase Health Check Endpoint
+  app.get("/api/supabase-status", async (_req, res) => {
+    const { data, error } = await fetchContactsSupabase();
+    if (error) {
+      return res.json({ connected: false, error, count: 0 });
+    }
+    return res.json({ connected: true, error: null, count: data ? data.length : 0 });
+  });
+
+  // API REST Routes for Supabase & SQLite Operations
   app.get("/api/contacts", async (_req, res) => {
     try {
-      const contacts = await getAllContactsDB();
-      res.json(contacts);
+      // Attempt to fetch from Supabase
+      const { data: supabaseContacts, error: sbError } = await fetchContactsSupabase();
+
+      if (!sbError && supabaseContacts !== null) {
+        return res.json({
+          source: "supabase",
+          contacts: supabaseContacts,
+          error: null,
+        });
+      }
+
+      // Fallback to SQLite if Supabase fails or table not configured
+      const sqliteContacts = await getAllContactsDB();
+      res.json({
+        source: "sqlite",
+        contacts: sqliteContacts,
+        error: sbError || "Supabase not connected",
+      });
     } catch (err: any) {
       console.error("Error fetching contacts:", err);
-      res.status(500).json({ error: "Failed to fetch contacts" });
+      const sqliteContacts = await getAllContactsDB();
+      res.json({
+        source: "sqlite",
+        contacts: sqliteContacts,
+        error: err?.message || "Failed to fetch contacts from Supabase",
+      });
     }
   });
 
@@ -43,8 +79,17 @@ async function startServer() {
         createdAt,
       };
 
+      // Store in local SQLite
       await addContactDB(newContact);
-      res.status(201).json(newContact);
+
+      // Attempt storing in Supabase
+      const sbResult = await addContactSupabase(newContact);
+
+      res.status(201).json({
+        contact: newContact,
+        supabaseSaved: sbResult.success,
+        supabaseError: sbResult.error,
+      });
     } catch (err: any) {
       console.error("Error creating contact:", err);
       res.status(500).json({ error: "Failed to create contact" });
@@ -56,8 +101,17 @@ async function startServer() {
       const { id } = req.params;
       const { name, phone, place, isFavorite } = req.body;
 
+      // Update in local SQLite
       await updateContactDB(id, { name, phone, place, isFavorite });
-      res.json({ success: true });
+
+      // Update in Supabase
+      const sbResult = await updateContactSupabase(id, { name, phone, place, isFavorite });
+
+      res.json({
+        success: true,
+        supabaseSaved: sbResult.success,
+        supabaseError: sbResult.error,
+      });
     } catch (err: any) {
       console.error("Error updating contact:", err);
       res.status(500).json({ error: "Failed to update contact" });
@@ -67,8 +121,18 @@ async function startServer() {
   app.delete("/api/contacts/:id", async (req, res) => {
     try {
       const { id } = req.params;
+
+      // Delete from local SQLite
       await deleteContactDB(id);
-      res.json({ success: true });
+
+      // Delete from Supabase
+      const sbResult = await deleteContactSupabase(id);
+
+      res.json({
+        success: true,
+        supabaseDeleted: sbResult.success,
+        supabaseError: sbResult.error,
+      });
     } catch (err: any) {
       console.error("Error deleting contact:", err);
       res.status(500).json({ error: "Failed to delete contact" });
