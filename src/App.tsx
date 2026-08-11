@@ -1,11 +1,21 @@
 import React, { useState, useEffect } from 'react';
-import { User, Phone, MapPin, Plus, Trash2, Edit2, Search, Check, X, Contact as ContactIcon, Database, HardDrive } from 'lucide-react';
+import {
+  User,
+  Phone,
+  MapPin,
+  Plus,
+  Trash2,
+  Edit2,
+  Search,
+  Check,
+  X,
+  Contact as ContactIcon,
+} from 'lucide-react';
 import { Contact } from './types';
 import { loadContacts, saveContacts, getAvatarColor, getInitials } from './utils/storage';
 
 export default function App() {
   const [contacts, setContacts] = useState<Contact[]>(loadContacts);
-  const [isDbConnected, setIsDbConnected] = useState<boolean>(false);
   const [loading, setLoading] = useState<boolean>(true);
 
   // Form states
@@ -18,24 +28,22 @@ export default function App() {
   const [searchQuery, setSearchQuery] = useState('');
 
   // Form validation errors
-  const [error, setError] = useState('');
+  const [formError, setFormError] = useState('');
 
-  // Fetch contacts from SQLite server backend
+  // Fetch contacts from server
   const fetchContacts = async () => {
     try {
       setLoading(true);
       const res = await fetch('/api/contacts');
       if (res.ok) {
         const data = await res.json();
-        setContacts(data);
-        setIsDbConnected(true);
-        saveContacts(data);
-      } else {
-        setIsDbConnected(false);
+        if (Array.isArray(data)) {
+          setContacts(data);
+          saveContacts(data);
+        }
       }
     } catch (err) {
-      console.warn('Backend SQLite API unavailable, using local storage fallback:', err);
-      setIsDbConnected(false);
+      console.warn('Backend API fetch notice, using local storage:', err);
     } finally {
       setLoading(false);
     }
@@ -48,56 +56,50 @@ export default function App() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim() || !phone.trim() || !place.trim()) {
-      setError('Please fill in Name, Phone Number, and Place.');
+      setFormError('Please fill in Name, Phone Number, and Place.');
       return;
     }
 
-    setError('');
+    setFormError('');
 
     if (editingId) {
-      // Update contact
+      // Edit mode
       const updatedData = { name: name.trim(), phone: phone.trim(), place: place.trim() };
       
-      // Update state locally first
       const updatedList = contacts.map((c) =>
         c.id === editingId ? { ...c, ...updatedData } : c
       );
       setContacts(updatedList);
       saveContacts(updatedList);
 
-      // Sync with SQLite backend
-      if (isDbConnected) {
-        try {
-          await fetch(`/api/contacts/${editingId}`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(updatedData),
-          });
-        } catch (err) {
-          console.error('Failed to update contact in SQLite:', err);
-        }
+      try {
+        await fetch(`/api/contacts/${editingId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(updatedData),
+        });
+      } catch (err) {
+        console.error('Failed to update contact via API:', err);
       }
 
       setEditingId(null);
     } else {
-      // Create contact
+      // Create mode
       const newContactData = { name: name.trim(), phone: phone.trim(), place: place.trim() };
 
-      if (isDbConnected) {
-        try {
-          const res = await fetch('/api/contacts', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(newContactData),
-          });
-          if (res.ok) {
-            const savedContact = await res.json();
-            const newList = [savedContact, ...contacts];
-            setContacts(newList);
-            saveContacts(newList);
-          }
-        } catch (err) {
-          console.error('Failed to save contact to SQLite:', err);
+      try {
+        const res = await fetch('/api/contacts', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(newContactData),
+        });
+
+        if (res.ok) {
+          const createdContact = await res.json();
+          const newList = [createdContact, ...contacts];
+          setContacts(newList);
+          saveContacts(newList);
+        } else {
           // Local fallback
           const localContact: Contact = {
             id: `contact-${Date.now()}`,
@@ -109,7 +111,8 @@ export default function App() {
           setContacts(newList);
           saveContacts(newList);
         }
-      } else {
+      } catch (err) {
+        console.error('Failed to create contact via API:', err);
         const localContact: Contact = {
           id: `contact-${Date.now()}`,
           ...newContactData,
@@ -132,7 +135,7 @@ export default function App() {
     setName(contact.name);
     setPhone(contact.phone);
     setPlace(contact.place);
-    setError('');
+    setFormError('');
   };
 
   const handleCancelEdit = () => {
@@ -140,7 +143,7 @@ export default function App() {
     setName('');
     setPhone('');
     setPlace('');
-    setError('');
+    setFormError('');
   };
 
   const handleDelete = async (id: string) => {
@@ -152,14 +155,12 @@ export default function App() {
       handleCancelEdit();
     }
 
-    if (isDbConnected) {
-      try {
-        await fetch(`/api/contacts/${id}`, {
-          method: 'DELETE',
-        });
-      } catch (err) {
-        console.error('Failed to delete contact from SQLite:', err);
-      }
+    try {
+      await fetch(`/api/contacts/${id}`, {
+        method: 'DELETE',
+      });
+    } catch (err) {
+      console.error('Failed to delete contact via API:', err);
     }
   };
 
@@ -175,7 +176,7 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 font-sans antialiased py-8 px-4 sm:px-6">
-      <div className="max-w-3xl mx-auto space-y-8">
+      <div className="max-w-3xl mx-auto space-y-6">
         
         {/* Simple Page Header */}
         <div className="text-center">
@@ -203,9 +204,9 @@ export default function App() {
           </h2>
 
           <form onSubmit={handleSubmit} className="space-y-4">
-            {error && (
+            {formError && (
               <p className="text-xs text-rose-500 font-medium bg-rose-50 dark:bg-rose-950/50 p-2.5 rounded-xl border border-rose-200/60 dark:border-rose-900">
-                {error}
+                {formError}
               </p>
             )}
 
