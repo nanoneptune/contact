@@ -26,10 +26,18 @@ export async function getDb(): Promise<Database> {
       name TEXT NOT NULL,
       phone TEXT NOT NULL,
       place TEXT NOT NULL,
+      email TEXT,
       isFavorite INTEGER DEFAULT 0,
       createdAt INTEGER NOT NULL
     );
   `);
+
+  // Safely attempt adding email column if missing
+  try {
+    db.run(`ALTER TABLE contacts ADD COLUMN email TEXT;`);
+  } catch (_e) {
+    // Column already exists
+  }
 
   saveDb();
   return db;
@@ -53,6 +61,7 @@ export async function getAllContactsDB(): Promise<Contact[]> {
       name: String(row.name),
       phone: String(row.phone),
       place: String(row.place),
+      email: row.email ? String(row.email) : undefined,
       isFavorite: Boolean(row.isFavorite),
       createdAt: Number(row.createdAt),
     });
@@ -66,16 +75,18 @@ export async function addContactDB(contact: {
   name: string;
   phone: string;
   place: string;
+  email?: string;
   isFavorite?: boolean;
   createdAt?: number;
 }): Promise<Contact> {
   const database = await getDb();
   const createdAt = contact.createdAt || Date.now();
   const isFavorite = contact.isFavorite ? 1 : 0;
+  const email = contact.email || null;
 
   database.run(
-    'INSERT INTO contacts (id, name, phone, place, isFavorite, createdAt) VALUES (?, ?, ?, ?, ?, ?)',
-    [contact.id, contact.name, contact.phone, contact.place, isFavorite, createdAt]
+    'INSERT INTO contacts (id, name, phone, place, email, isFavorite, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?)',
+    [contact.id, contact.name, contact.phone, contact.place, email, isFavorite, createdAt]
   );
 
   saveDb();
@@ -85,6 +96,7 @@ export async function addContactDB(contact: {
     name: contact.name,
     phone: contact.phone,
     place: contact.place,
+    email: contact.email || undefined,
     isFavorite: Boolean(isFavorite),
     createdAt,
   };
@@ -92,19 +104,22 @@ export async function addContactDB(contact: {
 
 export async function updateContactDB(
   id: string,
-  data: { name: string; phone: string; place: string; isFavorite?: boolean }
+  data: { name: string; phone: string; place: string; email?: string; isFavorite?: boolean }
 ): Promise<void> {
   const database = await getDb();
+  const email = data.email || null;
+
   if (data.isFavorite !== undefined) {
     database.run(
-      'UPDATE contacts SET name = ?, phone = ?, place = ?, isFavorite = ? WHERE id = ?',
-      [data.name, data.phone, data.place, data.isFavorite ? 1 : 0, id]
+      'UPDATE contacts SET name = ?, phone = ?, place = ?, email = ?, isFavorite = ? WHERE id = ?',
+      [data.name, data.phone, data.place, email, data.isFavorite ? 1 : 0, id]
     );
   } else {
-    database.run('UPDATE contacts SET name = ?, phone = ?, place = ? WHERE id = ?', [
+    database.run('UPDATE contacts SET name = ?, phone = ?, place = ?, email = ? WHERE id = ?', [
       data.name,
       data.phone,
       data.place,
+      email,
       id,
     ]);
   }

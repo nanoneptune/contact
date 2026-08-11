@@ -1,1 +1,61 @@
 @import "tailwindcss";
+
+@layer utilities {
+  .neu-bg {
+    background-color: #eef2f7;
+  }
+  .dark .neu-bg {
+    background-color: #0f172a;
+  }
+
+  .neu-flat {
+    background: #eef2f7;
+    box-shadow: 6px 6px 14px #d1d9e6, -6px -6px 14px #ffffff;
+  }
+  .dark .neu-flat {
+    background: #1e293b;
+    box-shadow: 6px 6px 14px #0b101d, -6px -6px 14px #2b3953;
+  }
+
+  .neu-pressed {
+    background: #eef2f7;
+    box-shadow: inset 3px 3px 6px #d1d9e6, inset -3px -3px 6px #ffffff;
+  }
+  .dark .neu-pressed {
+    background: #1e293b;
+    box-shadow: inset 3px 3px 6px #0b101d, inset -3px -3px 6px #2b3953;
+  }
+
+  .neu-card {
+    border-radius: 24px;
+    background: rgba(255, 255, 255, 0.85);
+    backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.7);
+    box-shadow: 8px 8px 18px rgba(166, 180, 200, 0.25), -8px -8px 18px rgba(255, 255, 255, 0.9);
+  }
+  .dark .neu-card {
+    background: rgba(30, 41, 59, 0.85);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    box-shadow: 8px 8px 18px rgba(10, 15, 26, 0.5), -8px -8px 18px rgba(40, 53, 76, 0.4);
+  }
+
+  .neu-button {
+    border-radius: 9999px;
+    transition: all 0.2s ease-in-out;
+    box-shadow: 4px 4px 10px rgba(166, 180, 200, 0.3), -4px -4px 10px rgba(255, 255, 255, 0.9);
+  }
+  .neu-button:active {
+    box-shadow: inset 2px 2px 5px rgba(166, 180, 200, 0.4), inset -2px -2px 5px rgba(255, 255, 255, 0.9);
+  }
+
+  .glass-card {
+    background: rgba(255, 255, 255, 0.65);
+    backdrop-filter: blur(16px);
+    border: 1px solid rgba(255, 255, 255, 0.8);
+  }
+  .dark .glass-card {
+    background: rgba(15, 23, 42, 0.65);
+    backdrop-filter: blur(16px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+  }
+}

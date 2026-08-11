@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { Contact } from '../types';
 import { getAvatarColor, getInitials } from '../utils/storage';
+import { EmbeddedGoogleMap } from './EmbeddedGoogleMap';
 
 interface ContactDetailModalProps {
   contact: Contact | null;
@@ -184,6 +185,15 @@ export const ContactDetailModal: React.FC<ContactDetailModalProps> = ({
               >
                 Maps <ExternalLink className="w-3 h-3" />
               </a>
+            </div>
+
+            {/* Embedded Interactive Google Map */}
+            <div className="pt-1">
+              <EmbeddedGoogleMap
+                location={contact.place}
+                title={`${contact.name}'s Location`}
+                height="180px"
+              />
             </div>
 
             {/* Notes if available */}

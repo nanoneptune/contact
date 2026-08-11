@@ -3,6 +3,7 @@ export interface Contact {
   name: string;
   phone: string;
   place: string;
+  email?: string;
   tag?: 'Personal' | 'Work' | 'Family' | 'VIP' | 'Other';
   notes?: string;
   isFavorite: boolean;
@@ -13,8 +14,9 @@ export interface ContactFormData {
   name: string;
   phone: string;
   place: string;
-  tag: 'Personal' | 'Work' | 'Family' | 'VIP' | 'Other';
-  notes: string;
+  email?: string;
+  tag?: 'Personal' | 'Work' | 'Family' | 'VIP' | 'Other';
+  notes?: string;
 }
 
 export type SortOption = 'name-asc' | 'name-desc' | 'recent' | 'place';

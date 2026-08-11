@@ -9,10 +9,11 @@ import {
   Copy,
   Check,
   MessageSquare,
-  ExternalLink,
+  Map as MapIcon,
 } from 'lucide-react';
 import { Contact } from '../types';
 import { getAvatarColor, getInitials } from '../utils/storage';
+import { EmbeddedGoogleMap } from './EmbeddedGoogleMap';
 
 interface ContactCardProps {
   contact: Contact;
@@ -31,6 +32,7 @@ export const ContactCard: React.FC<ContactCardProps> = ({
 }) => {
   const [copied, setCopied] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
+  const [showMap, setShowMap] = useState(false);
 
   const avatarStyle = getAvatarColor(contact.name);
   const initials = getInitials(contact.name);
@@ -96,10 +98,26 @@ export const ContactCard: React.FC<ContactCardProps> = ({
               )}
             </div>
             
-            {/* Location / Place */}
-            <div className="flex items-center gap-1 text-xs text-slate-500 dark:text-slate-400 mt-1">
+            {/* Location / Place with quick map trigger */}
+            <div className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400 mt-1">
               <MapPin className="w-3.5 h-3.5 text-rose-500 shrink-0" />
-              <span className="truncate">{contact.place}</span>
+              <span className="truncate font-medium">{contact.place}</span>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setShowMap((prev) => !prev);
+                }}
+                className={`ml-1 px-1.5 py-0.5 rounded text-[10px] font-bold transition-all flex items-center gap-1 ${
+                  showMap
+                    ? 'bg-rose-500 text-white shadow-2xs'
+                    : 'bg-rose-50 text-rose-600 dark:bg-rose-950/50 dark:text-rose-400 hover:bg-rose-100'
+                }`}
+                title={showMap ? 'Hide Map' : 'View Google Map'}
+              >
+                <MapIcon className="w-3 h-3" />
+                <span>{showMap ? 'Hide' : 'Map'}</span>
+              </button>
             </div>
           </div>
         </div>
@@ -197,6 +215,17 @@ export const ContactCard: React.FC<ContactCardProps> = ({
           </a>
         </div>
       </div>
+
+      {/* Optional Embedded Google Map Frame */}
+      {showMap && (
+        <div className="mt-3 pt-3 border-t border-slate-100 dark:border-slate-800" onClick={(e) => e.stopPropagation()}>
+          <EmbeddedGoogleMap
+            location={contact.place}
+            title={`${contact.name}'s Location`}
+            height="150px"
+          />
+        </div>
+      )}
 
       {/* Optional Note excerpt if present */}
       {contact.notes && (

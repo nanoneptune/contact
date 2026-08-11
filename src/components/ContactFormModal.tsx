@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { User, Phone, MapPin, Tag, FileText, X, Check, AlertCircle } from 'lucide-react';
 import { Contact, ContactFormData } from '../types';
+import { EmbeddedGoogleMap } from './EmbeddedGoogleMap';
 
 interface ContactFormModalProps {
   isOpen: boolean;
@@ -241,6 +242,17 @@ export const ContactFormModal: React.FC<ContactFormModalProps> = ({
                 </button>
               ))}
             </div>
+
+            {/* Live Embedded Map Preview for Form Entry */}
+            {place.trim() && (
+              <div className="mt-2.5">
+                <EmbeddedGoogleMap
+                  location={place}
+                  title="Location Preview"
+                  height="130px"
+                />
+              </div>
+            )}
           </div>
 
           {/* Category Tag Selection */}

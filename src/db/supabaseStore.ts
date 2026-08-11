@@ -30,6 +30,7 @@ export async function fetchContactsSupabase(): Promise<SupabaseResponse<Contact[
         name: String(item.name || ''),
         phone: String(item.phone || ''),
         place: String(item.place || ''),
+        email: item.email ? String(item.email) : undefined,
         isFavorite: Boolean(
           item.isFavorite ?? item.is_favorite ?? item.isfavorite ?? false
         ),
@@ -50,31 +51,17 @@ export async function fetchContactsSupabase(): Promise<SupabaseResponse<Contact[
 
 export async function addContactSupabase(contact: Contact): Promise<{ success: boolean; error: string | null }> {
   try {
-    // First try camelCase payload
-    const payloadCamel = {
+    const payload = {
       id: contact.id,
       name: contact.name,
       phone: contact.phone,
       place: contact.place,
+      email: contact.email || null,
       isFavorite: Boolean(contact.isFavorite),
       createdAt: contact.createdAt,
     };
 
-    let { error } = await supabase.from('contacts').insert([payloadCamel]);
-
-    if (error && (error.message.includes('column') || error.code === 'PGRST204')) {
-      // Retry with snake_case fields
-      const payloadSnake = {
-        id: contact.id,
-        name: contact.name,
-        phone: contact.phone,
-        place: contact.place,
-        is_favorite: Boolean(contact.isFavorite),
-        created_at: contact.createdAt,
-      };
-      const retry = await supabase.from('contacts').insert([payloadSnake]);
-      error = retry.error;
-    }
+    const { error } = await supabase.from('contacts').insert([payload]);
 
     if (error) {
       console.warn('Supabase insert error:', error.message);
@@ -90,31 +77,24 @@ export async function addContactSupabase(contact: Contact): Promise<{ success: b
 
 export async function updateContactSupabase(
   id: string,
-  data: { name: string; phone: string; place: string; isFavorite?: boolean }
+  data: { name: string; phone: string; place: string; email?: string; isFavorite?: boolean }
 ): Promise<{ success: boolean; error: string | null }> {
   try {
     const updateData: any = {
       name: data.name,
       phone: data.phone,
       place: data.place,
+      email: data.email || null,
     };
 
     if (data.isFavorite !== undefined) {
       updateData.isFavorite = data.isFavorite;
-      updateData.is_favorite = data.isFavorite;
     }
 
-    let { error } = await supabase
+    const { error } = await supabase
       .from('contacts')
       .update(updateData)
       .eq('id', id);
-
-    if (error && error.message.includes('column')) {
-      // Retry updating basic fields without isFavorite column if missing
-      const basicData = { name: data.name, phone: data.phone, place: data.place };
-      const retry = await supabase.from('contacts').update(basicData).eq('id', id);
-      error = retry.error;
-    }
 
     if (error) {
       console.warn('Supabase update error:', error.message);
