@@ -256,10 +256,16 @@ export default function App() {
   const emailableCount = contacts.filter((c) => c.email && c.email.includes('@')).length;
 
   return (
-    <div className="min-h-screen bg-[#eef2f7] dark:bg-[#0f172a] text-[#0f172a] dark:text-slate-100 font-sans antialiased pb-28 pt-4 px-3 sm:px-6">
-      
+    <div className="relative min-h-screen bg-[#eef2f7] dark:bg-[#0f172a] text-[#0f172a] dark:text-slate-100 font-sans antialiased pb-28 pt-4 px-3 sm:px-6 overflow-hidden">
+      {/* Soft Abstract Gradient Flow Background Effects */}
+      <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden">
+        <div className="absolute -top-20 -left-20 w-96 h-96 bg-gradient-to-br from-indigo-300/40 via-purple-300/30 to-pink-300/20 dark:from-indigo-900/30 dark:via-purple-900/20 dark:to-pink-900/10 rounded-full blur-3xl animate-pulse" />
+        <div className="absolute top-1/3 -right-20 w-96 h-96 bg-gradient-to-bl from-cyan-300/30 via-blue-300/30 to-indigo-300/20 dark:from-cyan-900/20 dark:via-blue-900/20 dark:to-indigo-900/10 rounded-full blur-3xl animate-pulse duration-1000" />
+        <div className="absolute -bottom-20 left-1/4 w-96 h-96 bg-gradient-to-tr from-purple-300/30 via-pink-300/20 to-amber-200/20 dark:from-purple-900/20 dark:via-pink-900/10 dark:to-amber-900/10 rounded-full blur-3xl animate-pulse duration-700" />
+      </div>
+
       {/* MOBILE APP CONTAINER FRAME */}
-      <div className="max-w-md mx-auto space-y-4">
+      <div className="relative z-10 max-w-md mx-auto space-y-4">
         
         {/* COMPACT APP HEADER */}
         <div className="flex items-center justify-between px-2 pt-1 pb-1">

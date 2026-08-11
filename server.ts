@@ -2,6 +2,7 @@ import express from "express";
 import path from "path";
 import nodemailer from "nodemailer";
 import { createServer as createViteServer } from "vite";
+import { GoogleGenAI } from "@google/genai";
 import {
   getAllContactsDB,
   addContactDB,
@@ -283,13 +284,12 @@ async function startServer() {
     }
   });
 
-  // API Route: Groq LLM AI Conversation
+  // API Route: AI Voice Conversation (Gemini Primary + Groq Fallback)
   app.post("/api/ai-chat", async (req, res) => {
     try {
-      const { userMessage, contacts, history, languageCode } = req.body;
-      const groqKey = process.env.GROQ_API_KEY || "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";
+      const { userMessage, contacts, history, languageCode } = req.body || {};
 
-      if (!userMessage) {
+      if (!userMessage || typeof userMessage !== "string") {
         return res.status(400).json({ error: "User message is required." });
       }
 
@@ -321,43 +321,82 @@ INSTRUCTIONS:
 3. Keep answers conversational, crisp, and under 120 words so they sound great over speech synthesis / talkback.
 4. Avoid markdown heavy tables or code blocks unless requested.`;
 
-      const messages = [
-        { role: "system", content: systemPrompt },
-        ...(Array.isArray(history) ? history.slice(-6) : []),
-        { role: "user", content: userMessage }
-      ];
+      // 1. Try Google Gemini API first
+      const geminiApiKey = process.env.GEMINI_API_KEY;
+      if (geminiApiKey) {
+        try {
+          const ai = new GoogleGenAI({ apiKey: geminiApiKey });
+          const contents = [
+            ...(Array.isArray(history)
+              ? history.slice(-6).map((h: any) => `${h.role === 'user' ? 'User' : 'Assistant'}: ${h.content}`)
+              : []),
+            `User: ${userMessage}`
+          ].join("\n");
 
-      const groqRes = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          "Authorization": `Bearer ${groqKey}`,
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          model: "llama-3.3-70b-versatile",
-          messages,
-          temperature: 0.7,
-          max_tokens: 400
-        })
-      });
+          const geminiRes = await ai.models.generateContent({
+            model: "gemini-2.5-flash",
+            contents: `${systemPrompt}\n\n${contents}`,
+          });
 
-      if (!groqRes.ok) {
-        const errText = await groqRes.text();
-        console.error("[Groq API Error]:", groqRes.status, errText);
-        // Fallback response if API fails or quota exceeded
-        return res.json({
-          reply: `Hello! I am your AI Talk assistant. You currently have ${contacts?.length || 0} saved contacts. How can I help you message or locate someone today?`,
-          rawError: errText
-        });
+          const geminiReply = geminiRes.text;
+          if (geminiReply && geminiReply.trim()) {
+            return res.json({ reply: geminiReply.trim() });
+          }
+        } catch (geminiError) {
+          console.error("[Gemini API Attempt Failed]:", geminiError);
+        }
       }
 
-      const data = await groqRes.json();
-      const reply = data.choices?.[0]?.message?.content || "Hello! How can I assist you with your saved contacts today?";
+      // 2. Try Groq API as Secondary
+      const groqKey = process.env.GROQ_API_KEY || "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";
+      if (groqKey) {
+        try {
+          const messages = [
+            { role: "system", content: systemPrompt },
+            ...(Array.isArray(history) ? history.slice(-6) : []),
+            { role: "user", content: userMessage }
+          ];
 
-      return res.json({ reply });
+          const groqRes = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+            method: "POST",
+            headers: {
+              "Authorization": `Bearer ${groqKey}`,
+              "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+              model: "llama-3.3-70b-versatile",
+              messages,
+              temperature: 0.7,
+              max_tokens: 400
+            })
+          });
+
+          if (groqRes.ok) {
+            const data = await groqRes.json();
+            const groqReply = data.choices?.[0]?.message?.content;
+            if (groqReply) {
+              return res.json({ reply: groqReply.trim() });
+            }
+          }
+        } catch (groqError) {
+          console.error("[Groq API Attempt Failed]:", groqError);
+        }
+      }
+
+      // 3. Intelligent Local Fallback Response
+      const contactCount = Array.isArray(contacts) ? contacts.length : 0;
+      let fallbackReply = `Hello! I am your AI Voice assistant. You have ${contactCount} saved contact${contactCount === 1 ? '' : 's'}. How can I help you message, locate, or organize them today?`;
+      
+      if (languageCode === "kn-IN") {
+        fallbackReply = `ನಮಸ್ಕಾರ! ನಾನು ನಿಮ್ಮ ಎಐ ಧ್ವನಿ ಸಹಾಯಕ. ನಿಮ್ಮ ಬಳಿ ${contactCount} ಉಳಿಸಿದ ಸಂಪರ್ಕಗಳಿವೆ. ನಾನು ನಿಮಗೆ ಹೇಗೆ ಸಹಾಯ ಮಾಡಲಿ?`;
+      } else if (languageCode === "hi-IN") {
+        fallbackReply = `नमस्ते! मैं आपका एआई वॉयस असिस्टेंट हूं। आपके पास ${contactCount} सेव किए गए संपर्क हैं। मैं आपकी क्या मदद कर सकता हूं?`;
+      }
+
+      return res.json({ reply: fallbackReply });
     } catch (err: any) {
       console.error("[AI Chat Route Error]:", err);
-      return res.status(500).json({ error: err?.message || "Failed to process AI conversation." });
+      return res.json({ reply: "Hello! I am your AI Assistant. How can I help you manage your contacts today?" });
     }
   });
 

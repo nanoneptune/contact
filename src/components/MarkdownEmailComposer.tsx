@@ -173,22 +173,17 @@ export default function MarkdownEmailComposer({ contacts }: MarkdownEmailCompose
 
   return (
     <div className="space-y-6">
-      {/* Header Info Banner */}
-      <div className="bg-gradient-to-r from-indigo-900 to-slate-900 text-white rounded-2xl p-6 shadow-md border border-indigo-800/40 space-y-3">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2.5">
-            <Mail className="w-5 h-5 text-indigo-400" />
-            <h2 className="text-base font-semibold tracking-wide">
-              Interactive Markdown Mailer
-            </h2>
-          </div>
-          <span className="text-[11px] font-mono bg-indigo-950/80 text-indigo-300 px-2.5 py-1 rounded-full border border-indigo-700/50">
-            Sender: nanoneptunemusic@gmail.com
+      {/* Sender Info Banner */}
+      <div className="bg-gradient-to-r from-indigo-900 via-slate-900 to-slate-950 text-white rounded-2xl p-4 shadow-md border border-indigo-800/40 flex flex-wrap items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <Mail className="w-4 h-4 text-indigo-400" />
+          <span className="text-xs text-slate-300">
+            Compose rich formatted messages and send directly via Gmail SMTP.
           </span>
         </div>
-        <p className="text-xs text-slate-300 leading-relaxed">
-          Compose raw Markdown or HTML messages, apply colors, bold/italics, and preview rendered output before sending real emails directly via Gmail SMTP.
-        </p>
+        <span className="text-[11px] font-mono bg-indigo-950/80 text-indigo-300 px-2.5 py-0.5 rounded-full border border-indigo-700/50">
+          Sender: nanoneptunemusic@gmail.com
+        </span>
       </div>
 
       {/* Recipient & Subject Form */}
@@ -485,12 +480,12 @@ export default function MarkdownEmailComposer({ contacts }: MarkdownEmailCompose
             </div>
           </div>
 
-          {/* Editor & Rendered Content Panels */}
-          <div className="grid grid-cols-1 md:grid-cols-2 min-h-[320px]">
+          {/* Editor & Rendered Content Panels - Top & Bottom Layout */}
+          <div className="flex flex-col divide-y divide-slate-200 dark:divide-slate-800">
             
-            {/* Raw Markdown Editor Pane */}
+            {/* Raw Markdown Editor Pane (Top) */}
             {(viewMode === 'split' || viewMode === 'raw') && (
-              <div className={`p-3 ${viewMode === 'split' ? 'border-r border-slate-200 dark:border-slate-800' : 'col-span-2'}`}>
+              <div className="p-3">
                 <div className="flex items-center justify-between text-[11px] font-semibold text-slate-400 mb-2">
                   <span>RAW MARKDOWN INPUT</span>
                   <Sparkles className="w-3 h-3 text-indigo-500" />
@@ -500,19 +495,19 @@ export default function MarkdownEmailComposer({ contacts }: MarkdownEmailCompose
                   value={markdown}
                   onChange={(e) => setMarkdown(e.target.value)}
                   placeholder="Type your markdown message here..."
-                  className="w-full h-[300px] p-3 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl font-mono text-xs text-slate-900 dark:text-slate-100 focus:outline-none focus:border-indigo-500 resize-y"
+                  className="w-full h-[220px] p-3 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl font-mono text-xs text-slate-900 dark:text-slate-100 focus:outline-none focus:border-indigo-500 resize-y"
                 />
               </div>
             )}
 
-            {/* Rendered Markdown Preview Pane */}
+            {/* Rendered Markdown Preview Pane (Bottom) */}
             {(viewMode === 'split' || viewMode === 'preview') && (
-              <div className={`p-3 ${viewMode === 'preview' ? 'col-span-2' : ''}`}>
+              <div className="p-3">
                 <div className="flex items-center justify-between text-[11px] font-semibold text-slate-400 mb-2">
                   <span>LIVE RENDERED OUTPUT</span>
                   <Eye className="w-3 h-3 text-emerald-500" />
                 </div>
-                <div className="w-full h-[300px] p-4 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl overflow-y-auto text-slate-900 dark:text-slate-100 text-xs prose dark:prose-invert max-w-none">
+                <div className="w-full min-h-[180px] max-h-[320px] p-4 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl overflow-y-auto text-slate-900 dark:text-slate-100 text-xs prose dark:prose-invert max-w-none">
                   <ReactMarkdown remarkPlugins={[remarkGfm]}>
                     {markdown}
                   </ReactMarkdown>
