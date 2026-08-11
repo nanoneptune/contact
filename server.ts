@@ -7,6 +7,12 @@ import {
   updateContactDB,
   deleteContactDB,
 } from "./src/db/sqlite";
+import {
+  fetchContactsSupabase,
+  addContactSupabase,
+  updateContactSupabase,
+  deleteContactSupabase,
+} from "./src/db/supabaseStore";
 
 async function startServer() {
   const app = express();
@@ -14,13 +20,20 @@ async function startServer() {
 
   app.use(express.json());
 
-  // API REST Routes for SQLite Contact Operations
+  // API REST Routes for Supabase & SQLite Operations
   app.get("/api/contacts", async (_req, res) => {
     try {
+      // Try fetching from Supabase first
+      const supabaseContacts = await fetchContactsSupabase();
+      if (supabaseContacts !== null) {
+        return res.json(supabaseContacts);
+      }
+
+      // Fallback to SQLite
       const contacts = await getAllContactsDB();
       res.json(contacts);
     } catch (err) {
-      console.error("Error fetching contacts from SQLite:", err);
+      console.error("Error fetching contacts:", err);
       res.status(500).json({ error: "Failed to fetch contacts" });
     }
   });
@@ -31,15 +44,27 @@ async function startServer() {
       if (!name || !phone || !place) {
         return res.status(400).json({ error: "Name, phone, and place are required" });
       }
-      const newContact = await addContactDB({
-        id: `contact-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+
+      const id = `contact-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
+      const createdAt = Date.now();
+      const newContact = {
+        id,
         name,
         phone,
         place,
-      });
+        isFavorite: false,
+        createdAt,
+      };
+
+      // Store in SQLite
+      await addContactDB(newContact);
+
+      // Store in Supabase
+      await addContactSupabase(newContact);
+
       res.status(201).json(newContact);
     } catch (err) {
-      console.error("Error creating contact in SQLite:", err);
+      console.error("Error creating contact:", err);
       res.status(500).json({ error: "Failed to create contact" });
     }
   });
@@ -48,10 +73,16 @@ async function startServer() {
     try {
       const { id } = req.params;
       const { name, phone, place, isFavorite } = req.body;
+
+      // Update in SQLite
       await updateContactDB(id, { name, phone, place, isFavorite });
+
+      // Update in Supabase
+      await updateContactSupabase(id, { name, phone, place, isFavorite });
+
       res.json({ success: true });
     } catch (err) {
-      console.error("Error updating contact in SQLite:", err);
+      console.error("Error updating contact:", err);
       res.status(500).json({ error: "Failed to update contact" });
     }
   });
@@ -59,10 +90,16 @@ async function startServer() {
   app.delete("/api/contacts/:id", async (req, res) => {
     try {
       const { id } = req.params;
+
+      // Delete from SQLite
       await deleteContactDB(id);
+
+      // Delete from Supabase
+      await deleteContactSupabase(id);
+
       res.json({ success: true });
     } catch (err) {
-      console.error("Error deleting contact from SQLite:", err);
+      console.error("Error deleting contact:", err);
       res.status(500).json({ error: "Failed to delete contact" });
     }
   });
