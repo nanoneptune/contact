@@ -147,7 +147,15 @@ export default function MarkdownEmailComposer({ contacts }: MarkdownEmailCompose
         }),
       });
 
-      const data = await res.json();
+      let data: any = {};
+      const contentType = res.headers.get('content-type');
+      if (contentType && contentType.includes('application/json')) {
+        data = await res.json();
+      } else {
+        const rawText = await res.text();
+        console.warn('Non-JSON response received from /api/send-email:', rawText.slice(0, 100));
+        data = { error: 'Server returned a non-JSON response. Please check SMTP settings.' };
+      }
 
       if (res.ok && data.success) {
         setSendStatus({

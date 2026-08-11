@@ -65,7 +65,15 @@ export default function GlassmorphismOtpModal({
         body: JSON.stringify({ email: email.trim() }),
       });
 
-      const data = await res.json();
+      let data: any = {};
+      const contentType = res.headers.get('content-type');
+      if (contentType && contentType.includes('application/json')) {
+        data = await res.json();
+      } else {
+        const rawText = await res.text();
+        console.warn('Non-JSON response received from /api/send-otp:', rawText.slice(0, 100));
+        data = { error: 'Server returned a non-JSON response. Please verify SMTP setup or try again.' };
+      }
 
       if (res.ok && data.success) {
         setOtpSent(true);
@@ -136,7 +144,15 @@ export default function GlassmorphismOtpModal({
         body: JSON.stringify({ email: email.trim(), otp: fullCode }),
       });
 
-      const data = await res.json();
+      let data: any = {};
+      const contentType = res.headers.get('content-type');
+      if (contentType && contentType.includes('application/json')) {
+        data = await res.json();
+      } else {
+        const rawText = await res.text();
+        console.warn('Non-JSON response received from /api/verify-otp:', rawText.slice(0, 100));
+        data = { error: 'Server returned a non-JSON response. Please verify OTP server connection.' };
+      }
 
       if (res.ok && data.verified) {
         setSuccessVerified(true);
