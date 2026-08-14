@@ -1,4 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import {
   Mic,
   MicOff,
@@ -10,23 +12,23 @@ import {
   User,
   Radio,
   RefreshCw,
-  Globe,
-  Zap,
-  CheckCircle2,
-  Languages,
   Play,
-  Pause,
+  Square,
   Copy,
   Check,
   RotateCcw,
-  Sliders,
-  Compass,
+  SlidersHorizontal,
+  Mail,
+  Search,
+  MessageSquare,
+  ArrowRight,
+  ChevronRight,
 } from 'lucide-react';
 import { Contact } from '../types';
 
 interface AiVoiceTalkbackProps {
   contacts: Contact[];
-  onSelectEmailContact?: (email: string) => void;
+  onDraftToMailer?: (subject: string, body: string, recipient?: string) => void;
 }
 
 interface ChatMessage {
@@ -35,18 +37,27 @@ interface ChatMessage {
   text: string;
   timestamp: string;
   source?: string;
+  emailDraft?: {
+    subject?: string;
+    body?: string;
+    recipient?: string;
+  };
 }
 
 type SupportedLanguage = 'kn-IN' | 'hi-IN' | 'en-IN';
+type AssistantMode = 'talk' | 'email_draft' | 'lookup';
 
 interface LanguageOption {
   code: SupportedLanguage;
   name: string;
   nativeName: string;
   flag: string;
-  subtext: string;
   sampleGreeting: string;
-  presets: string[];
+  presets: {
+    label: string;
+    prompt: string;
+    icon: 'search' | 'mail' | 'summary' | 'chat';
+  }[];
 }
 
 const LANGUAGE_OPTIONS: LanguageOption[] = [
@@ -55,13 +66,28 @@ const LANGUAGE_OPTIONS: LanguageOption[] = [
     name: 'Kannada',
     nativeName: 'ಕನ್ನಡ',
     flag: '🇮🇳',
-    subtext: 'ಕರ್ನಾಟಕ ಧ್ವನಿ ಗ್ರಹಿಕೆ ಹಾಗೂ Sarvam AI ಕನ್ನಡ Talkback',
-    sampleGreeting: 'ನಮಸ್ಕಾರ! 👋 ನಾನು ನಿಮ್ಮ AI ಧ್ವನಿ ಸಹಾಯಕ. ನಿಮ್ಮ ಸಂಪರ್ಕಗಳ ಬಗ್ಗೆ ಯಾವುದೇ ಪ್ರಶ್ನೆ ಕೇಳಿ!',
+    sampleGreeting: 'ನಮಸ್ಕಾರ! 👋 ನಾನು ನಿಮ್ಮ AI ಧ್ವನಿ ಸಹಾಯಕ. ನಿಮ್ಮ ಸಂಪರ್ಕಗಳ ಬಗ್ಗೆ ಕೇಳಿ ಅಥವಾ ಇಮೇಲ್ ರಚಿಸಲು ಹೇಳಿ!',
     presets: [
-      '👋 ನಮಸ್ಕಾರ! ನನ್ನ ಎಲ್ಲಾ ಸಂಪರ್ಕಗಳನ್ನು ಪಟ್ಟಿ ಮಾಡಿ',
-      '🔍 ಬೆಂಗಳೂರಿನಲ್ಲಿ ಯಾರು ಇದ್ದಾರೆ?',
-      '📝 ನನ್ನ ಸಂಪರ್ಕಗಳಿಗೆ ಇಮೇಲ್ ಡ್ರಾಫ್ಟ್ ಮಾಡಿ',
-      '📊 ಸಂಪರ್ಕಗಳ ವಿವರಗಳ ಸಾರಾಂಶ ಹೇಳಿ',
+      {
+        label: 'ಸಂಪರ್ಕಗಳ ಪಟ್ಟಿ',
+        prompt: 'ನನ್ನ ಎಲ್ಲಾ ಉಳಿಸಿದ ಸಂಪರ್ಕಗಳನ್ನು ವಿವರವಾಗಿ ಪಟ್ಟಿ ಮಾಡಿ',
+        icon: 'summary',
+      },
+      {
+        label: 'ಇಮೇಲ್ ಇರುವವರು ಯಾರು?',
+        prompt: 'ಯಾವ ಸಂಪರ್ಕಗಳಿಗೆ ಇಮೇಲ್ ವಿಳಾಸವಿದೆ ಎಂದು ತಿಳಿಸಿ?',
+        icon: 'search',
+      },
+      {
+        label: 'ಶುಭಹಾರೈಕೆ ಇಮೇಲ್ ಡ್ರಾಫ್ಟ್',
+        prompt: 'ನನ್ನ ಸಂಪರ್ಕಗಳಿಗಾಗಿ ಒಂದು ಆಕರ್ಷಕ ಶುಭಹಾರೈಕೆ ಇಮೇಲ್ ಡ್ರಾಫ್ಟ್ ಮಾಡಿ',
+        icon: 'mail',
+      },
+      {
+        label: 'ಬೆಂಗಳೂರಿನ ಸಂಪರ್ಕಗಳು',
+        prompt: 'ಬೆಂಗಳೂರಿನಲ್ಲಿ (Bangalore) ಇರುವ ಸಂಪರ್ಕಗಳು ಯಾರು?',
+        icon: 'search',
+      },
     ],
   },
   {
@@ -69,13 +95,28 @@ const LANGUAGE_OPTIONS: LanguageOption[] = [
     name: 'Hindi',
     nativeName: 'हिंदी',
     flag: '🇮🇳',
-    subtext: 'हिंदी आवाज़ पहचान एवं Sarvam AI हिंदी Talkback',
-    sampleGreeting: 'नमस्ते! 👋 मैं आपका AI वॉयस असिस्टेंट हूं। अपने संपर्कों के बारे में कुछ भी पूछें!',
+    sampleGreeting: 'नमस्ते! 👋 मैं आपका AI वॉयस असिस्टेंट हूं। अपने संपर्कों के बारे में कुछ भी पूछें या ईमेल ड्राफ्ट करवाएं!',
     presets: [
-      '👋 नमस्ते! मेरे सभी संपर्क दिखाएं',
-      '🔍 दिल्ली में कौन रहता है?',
-      '📝 मेरे संपर्कों के लिए ईमेल ड्राफ्ट करें',
-      '📊 संपर्कों का संक्षिप्त सारांश बताएं',
+      {
+        label: 'सभी संपर्क दिखाएं',
+        prompt: 'मेरे सभी सेव किए गए संपर्कों की सूची दिखाएं',
+        icon: 'summary',
+      },
+      {
+        label: 'ईमेल वाले संपर्क',
+        prompt: 'किन संपर्कों के पास ईमेल एड्रेस मौजूद है?',
+        icon: 'search',
+      },
+      {
+        label: 'औपचारिक ईमेल ड्राफ्ट',
+        prompt: 'एक पेशेवर और औपचारिक ईमेल ड्राफ्ट तैयार करें',
+        icon: 'mail',
+      },
+      {
+        label: 'संपर्कों का सारांश',
+        prompt: 'मेरे सभी संपर्कों और शहरों का संक्षिप्त विश्लेषण दें',
+        icon: 'summary',
+      },
     ],
   },
   {
@@ -83,23 +124,54 @@ const LANGUAGE_OPTIONS: LanguageOption[] = [
     name: 'English',
     nativeName: 'English (India)',
     flag: '🌐',
-    subtext: 'Indian English Speech Rec & Sarvam AI Voice',
-    sampleGreeting: 'Hello! 👋 I am your AI Voice Assistant. Ask me anything about your saved contacts!',
+    sampleGreeting: 'Hello! 👋 I am your AI Voice Assistant. Ask about your directory or dictate emails to draft!',
     presets: [
-      '👋 Greet & list all saved contacts',
-      '🔍 Who is located in New York?',
-      '📝 Draft an email for my contacts',
-      '📊 Tell me contact summary stats',
+      {
+        label: 'Summarize Contacts',
+        prompt: 'Summarize all my saved contacts with their places and emails',
+        icon: 'summary',
+      },
+      {
+        label: 'Find Email Ready',
+        prompt: 'Which contacts have a valid email address configured?',
+        icon: 'search',
+      },
+      {
+        label: 'Draft Meeting Email',
+        prompt: 'Draft a clean meeting announcement email with subject and markdown body',
+        icon: 'mail',
+      },
+      {
+        label: 'Location Breakdown',
+        prompt: 'Group all my contacts by their cities and locations',
+        icon: 'search',
+      },
     ],
   },
 ];
 
-export default function AiVoiceTalkback({ contacts }: AiVoiceTalkbackProps) {
+// Helper to extract email draft if AI replied with an email
+function extractEmailDraftFromText(text: string): { subject?: string; body?: string } | null {
+  const subjectMatch = text.match(/(?:Subject|ವಿಷಯ|विषय):\s*([^\n\r]+)/i);
+  if (subjectMatch) {
+    const subject = subjectMatch[1].trim().replace(/^[*_"]|[*_"]$/g, '');
+    const bodyPart = text.replace(/(?:Subject|ವಿಷಯ|विषय):\s*[^\n\r]+[\n\r]*/i, '').trim();
+    return { subject, body: bodyPart };
+  }
+  if (text.includes('# ') || text.includes('## ') || text.includes('Dear ') || text.includes('ಸ್ನೇಹಿತರೆ') || text.includes('नमस्ते')) {
+    return { subject: 'Update from Contacts Mailer', body: text };
+  }
+  return null;
+}
+
+export default function AiVoiceTalkback({ contacts, onDraftToMailer }: AiVoiceTalkbackProps) {
   const [selectedLang, setSelectedLang] = useState<SupportedLanguage>('kn-IN');
   const activeLangConfig = LANGUAGE_OPTIONS.find((l) => l.code === selectedLang) || LANGUAGE_OPTIONS[0];
 
-  const [activeVoiceMode, setActiveVoiceMode] = useState<'talk' | 'translate' | 'actions'>('talk');
+  const [activeMode, setActiveMode] = useState<AssistantMode>('talk');
   const [speechSpeed, setSpeechSpeed] = useState<number>(1.0);
+  const [autoTalkback, setAutoTalkback] = useState<boolean>(true);
+  const [showSettings, setShowSettings] = useState<boolean>(false);
 
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
@@ -114,36 +186,34 @@ export default function AiVoiceTalkback({ contacts }: AiVoiceTalkbackProps) {
   const [isListening, setIsListening] = useState(false);
   const [isAiSpeaking, setIsAiSpeaking] = useState(false);
   const [loadingAi, setLoadingAi] = useState(false);
-  const [autoTalkback, setAutoTalkback] = useState(true);
   const [copiedMsgId, setCopiedMsgId] = useState<string | null>(null);
-  const [langToast, setLangToast] = useState<string | null>('Selected Kannada (ಕನ್ನಡ) Voice Mode');
+  const [audioWaves, setAudioWaves] = useState<number[]>([20, 45, 75, 35, 90, 60, 40, 70, 30]);
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const recognitionRef = useRef<any>(null);
   const chatBottomRef = useRef<HTMLDivElement | null>(null);
 
+  // Auto-scroll chat stream
   useEffect(() => {
     chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, loadingAi]);
 
-  const handleSelectLanguage = (code: SupportedLanguage) => {
-    setSelectedLang(code);
-    const chosenConfig = LANGUAGE_OPTIONS.find((l) => l.code === code);
-    if (!chosenConfig) return;
-
-    setLangToast(`Voice Language switched to ${chosenConfig.name} (${chosenConfig.nativeName})`);
-    setTimeout(() => setLangToast(null), 3000);
-
-    const langSwitchMsg: ChatMessage = {
-      id: `lang-${Date.now()}`,
-      sender: 'ai',
-      text: `🌐 ${chosenConfig.flag} ${chosenConfig.sampleGreeting}`,
-      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+  // Dynamic waveform simulation when listening or AI speaking
+  useEffect(() => {
+    let interval: any = null;
+    if (isListening || isAiSpeaking) {
+      interval = setInterval(() => {
+        setAudioWaves(Array.from({ length: 12 }, () => Math.floor(Math.random() * 70) + 25));
+      }, 120);
+    } else {
+      setAudioWaves([15, 25, 20, 30, 25, 20, 35, 25, 20, 15, 25, 20]);
+    }
+    return () => {
+      if (interval) clearInterval(interval);
     };
+  }, [isListening, isAiSpeaking]);
 
-    setMessages((prev) => [...prev, langSwitchMsg]);
-  };
-
+  // Initialize Speech Recognition
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
@@ -175,9 +245,32 @@ export default function AiVoiceTalkback({ contacts }: AiVoiceTalkbackProps) {
     }
   }, [selectedLang]);
 
+  const handleSelectLanguage = (code: SupportedLanguage) => {
+    setSelectedLang(code);
+    const chosenConfig = LANGUAGE_OPTIONS.find((l) => l.code === code);
+    if (!chosenConfig) return;
+
+    if (isAiSpeaking) {
+      stopAudio();
+    }
+
+    const langSwitchMsg: ChatMessage = {
+      id: `lang-${Date.now()}`,
+      sender: 'ai',
+      text: `${chosenConfig.flag} **${chosenConfig.name} (${chosenConfig.nativeName})**\n\n${chosenConfig.sampleGreeting}`,
+      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+    };
+
+    setMessages((prev) => [...prev, langSwitchMsg]);
+  };
+
   const toggleMicListening = () => {
+    if (isAiSpeaking) {
+      stopAudio();
+    }
+
     if (!recognitionRef.current) {
-      alert('Speech Recognition is not supported on this browser. You can type your message below!');
+      alert('Speech Recognition is not supported on this browser. You can type your request in the input box!');
       return;
     }
 
@@ -189,7 +282,7 @@ export default function AiVoiceTalkback({ contacts }: AiVoiceTalkbackProps) {
       try {
         recognitionRef.current.start();
       } catch (err) {
-        console.error('Error starting speech rec:', err);
+        console.error('Error starting speech recognition:', err);
       }
     }
   };
@@ -199,6 +292,9 @@ export default function AiVoiceTalkback({ contacts }: AiVoiceTalkbackProps) {
     if (!query || loadingAi) return;
 
     setInputPrompt('');
+    if (isAiSpeaking) {
+      stopAudio();
+    }
 
     const userMsg: ChatMessage = {
       id: `usr-${Date.now()}`,
@@ -224,7 +320,7 @@ export default function AiVoiceTalkback({ contacts }: AiVoiceTalkbackProps) {
           contacts,
           history: historyFormatted,
           languageCode: selectedLang,
-          mode: activeVoiceMode,
+          mode: activeMode,
         }),
       });
 
@@ -243,12 +339,15 @@ export default function AiVoiceTalkback({ contacts }: AiVoiceTalkbackProps) {
         replySource = 'offline';
       }
 
+      const emailDraft = extractEmailDraftFromText(replyText);
+
       const aiMsg: ChatMessage = {
         id: `ai-${Date.now()}`,
         sender: 'ai',
         text: replyText,
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         source: replySource,
+        emailDraft: emailDraft || undefined,
       };
 
       setMessages((prev) => [...prev, aiMsg]);
@@ -331,6 +430,7 @@ export default function AiVoiceTalkback({ contacts }: AiVoiceTalkbackProps) {
   const stopAudio = () => {
     if (audioRef.current) {
       audioRef.current.pause();
+      audioRef.current.currentTime = 0;
     }
     if (typeof window !== 'undefined' && window.speechSynthesis) {
       window.speechSynthesis.cancel();
@@ -344,21 +444,19 @@ export default function AiVoiceTalkback({ contacts }: AiVoiceTalkbackProps) {
     setTimeout(() => setCopiedMsgId(null), 2000);
   };
 
-  return (
-    <div className="space-y-3.5 max-w-xl mx-auto">
-      {/* Toast Notification */}
-      {langToast && (
-        <div className="px-3.5 py-2 bg-slate-900 text-white text-xs font-medium rounded-xl flex items-center justify-between shadow-2xs">
-          <span>{langToast}</span>
-          <button onClick={() => setLangToast(null)} className="text-slate-400 hover:text-white text-xs">
-            ✕
-          </button>
-        </div>
-      )}
+  const handleTransferToMailer = (draft?: { subject?: string; body?: string; recipient?: string }) => {
+    if (onDraftToMailer && draft) {
+      onDraftToMailer(draft.subject || 'AI Generated Mail', draft.body || '', draft.recipient);
+    }
+  };
 
-      {/* Sleek Language & Controls Bar */}
-      <div className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border border-slate-200/80 dark:border-slate-800 rounded-2xl p-2 shadow-xs flex items-center justify-between gap-2">
-        <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none py-0.5">
+  return (
+    <div className="space-y-6 max-w-4xl mx-auto">
+      
+      {/* TOP CONTROL BAR: LANGUAGE PILLS & ACOUSTIC TOGGLES */}
+      <div className="ambient-card rounded-2xl p-3 sm:p-4 flex flex-wrap items-center justify-between gap-3 shadow-xs">
+        {/* Language Selection */}
+        <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none py-1">
           {LANGUAGE_OPTIONS.map((lang) => {
             const isSelected = selectedLang === lang.code;
             return (
@@ -366,151 +464,252 @@ export default function AiVoiceTalkback({ contacts }: AiVoiceTalkbackProps) {
                 key={lang.code}
                 type="button"
                 onClick={() => handleSelectLanguage(lang.code)}
-                className={`py-1.5 px-3 rounded-xl text-xs font-bold transition-all whitespace-nowrap flex items-center gap-1.5 ${
+                className={`py-2 px-3.5 rounded-xl text-xs font-semibold uppercase tracking-wider font-geist-mono transition-all whitespace-nowrap flex items-center gap-2 ${
                   isSelected
-                    ? 'bg-indigo-600 text-white shadow-xs'
-                    : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
+                    ? 'bg-[#1a1a1e] dark:bg-white text-white dark:text-[#1a1a1e] shadow-sm'
+                    : 'bg-black/5 dark:bg-white/5 text-slate-600 dark:text-slate-300 hover:bg-black/10 dark:hover:bg-white/10'
                 }`}
               >
                 <span>{lang.flag}</span>
                 <span>{lang.nativeName}</span>
+                <span className="opacity-60 text-[10px]">({lang.name})</span>
               </button>
             );
           })}
         </div>
 
-        <div className="flex items-center gap-1 shrink-0">
+        {/* Audio Preferences & Mode */}
+        <div className="flex items-center gap-2">
           <button
-            onClick={() => setSpeechSpeed(speechSpeed === 1.0 ? 1.25 : speechSpeed === 1.25 ? 1.5 : 1.0)}
-            className="px-2 py-1 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-[11px] font-bold rounded-lg hover:bg-slate-200 transition-colors"
-            title="Speech Speed"
+            type="button"
+            onClick={() => setSpeechSpeed(speechSpeed === 1.0 ? 1.25 : speechSpeed === 1.25 ? 1.5 : speechSpeed === 1.5 ? 0.8 : 1.0)}
+            className="px-3 py-2 bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 text-slate-700 dark:text-slate-300 text-xs font-geist-mono rounded-xl transition-all"
+            title="Adjust Speech Playback Rate"
           >
-            {speechSpeed}x
+            SPEED: <span className="font-bold text-[#5e5ce6]">{speechSpeed}x</span>
           </button>
+
           <button
+            type="button"
             onClick={() => setAutoTalkback(!autoTalkback)}
-            className={`p-1.5 rounded-lg text-xs transition-colors ${
+            className={`px-3 py-2 rounded-xl text-xs font-geist-mono flex items-center gap-1.5 transition-all ${
               autoTalkback
-                ? 'bg-indigo-50 text-indigo-600 dark:bg-indigo-950/80 dark:text-indigo-400'
-                : 'bg-slate-100 text-slate-400 dark:bg-slate-800'
+                ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20'
+                : 'bg-black/5 dark:bg-white/5 text-slate-400'
             }`}
-            title="Toggle Auto Voice"
+            title="Toggle Auto Vocal Response"
           >
             {autoTalkback ? <Volume2 className="w-3.5 h-3.5" /> : <VolumeX className="w-3.5 h-3.5" />}
+            <span className="hidden sm:inline">{autoTalkback ? 'VOICE ON' : 'MUTED'}</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setShowSettings(!showSettings)}
+            className={`p-2 rounded-xl text-xs transition-all ${
+              showSettings ? 'bg-[#5e5ce6] text-white' : 'bg-black/5 dark:bg-white/5 text-slate-500 hover:text-[#1a1a1e] dark:hover:text-white'
+            }`}
+            title="Assistant Mode Settings"
+          >
+            <SlidersHorizontal className="w-4 h-4" />
           </button>
         </div>
       </div>
 
-        {/* Minimalist Hero Voice Trigger Card */}
-      <div className="relative overflow-hidden bg-gradient-to-br from-indigo-900 via-slate-900 to-slate-950 text-white rounded-3xl p-5 shadow-lg border border-indigo-500/20 flex flex-col items-center justify-center text-center space-y-3">
-        {/* Soft Glowing Background Orbs */}
-        <div className="absolute -top-10 -right-10 w-40 h-40 bg-indigo-500/20 rounded-full blur-2xl pointer-events-none" />
-        <div className="absolute -bottom-10 -left-10 w-40 h-40 bg-purple-500/20 rounded-full blur-2xl pointer-events-none" />
+      {/* EXPANDABLE ASSISTANT MODE STRIP */}
+      {showSettings && (
+        <div className="ambient-card rounded-2xl p-4 grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+          <button
+            type="button"
+            onClick={() => setActiveMode('talk')}
+            className={`p-3 rounded-xl border text-left transition-all space-y-1 ${
+              activeMode === 'talk'
+                ? 'bg-[#5e5ce6]/10 border-[#5e5ce6] text-[#5e5ce6]'
+                : 'bg-white/40 dark:bg-slate-950/40 border-black/5 dark:border-white/5 text-slate-600 dark:text-slate-300'
+            }`}
+          >
+            <div className="font-geist-mono uppercase font-bold flex items-center gap-1.5">
+              <MessageSquare className="w-3.5 h-3.5" /> Conversational
+            </div>
+            <p className="text-[11px] opacity-75">Ask questions about saved contacts, locations, and details.</p>
+          </button>
 
-        {/* Engine Integration Badge */}
-        <div className="flex items-center gap-2 text-[10px] font-medium bg-indigo-950/80 border border-indigo-500/30 text-indigo-200 px-3 py-1 rounded-full shadow-2xs">
-          <span className="flex items-center gap-1 font-semibold text-amber-300">
-            <Zap className="w-3 h-3 text-amber-400" />
-            Groq LLaMA 3.3
-          </span>
-          <span className="text-slate-500">•</span>
-          <span className="flex items-center gap-1 font-semibold text-emerald-300">
-            <Volume2 className="w-3 h-3 text-emerald-400" />
-            Sarvam AI TTS
-          </span>
+          <button
+            type="button"
+            onClick={() => setActiveMode('email_draft')}
+            className={`p-3 rounded-xl border text-left transition-all space-y-1 ${
+              activeMode === 'email_draft'
+                ? 'bg-[#5e5ce6]/10 border-[#5e5ce6] text-[#5e5ce6]'
+                : 'bg-white/40 dark:bg-slate-950/40 border-black/5 dark:border-white/5 text-slate-600 dark:text-slate-300'
+            }`}
+          >
+            <div className="font-geist-mono uppercase font-bold flex items-center gap-1.5">
+              <Mail className="w-3.5 h-3.5" /> Email Author
+            </div>
+            <p className="text-[11px] opacity-75">Dictate key points to generate ready-to-dispatch markdown emails.</p>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveMode('lookup')}
+            className={`p-3 rounded-xl border text-left transition-all space-y-1 ${
+              activeMode === 'lookup'
+                ? 'bg-[#5e5ce6]/10 border-[#5e5ce6] text-[#5e5ce6]'
+                : 'bg-white/40 dark:bg-slate-950/40 border-black/5 dark:border-white/5 text-slate-600 dark:text-slate-300'
+            }`}
+          >
+            <div className="font-geist-mono uppercase font-bold flex items-center gap-1.5">
+              <Search className="w-3.5 h-3.5" /> Instant Lookup
+            </div>
+            <p className="text-[11px] opacity-75">Quick directory filtering and phone/email queries.</p>
+          </button>
         </div>
+      )}
 
-        {/* Big Interactive Mic Button */}
+      {/* AMBIENT HERO SOUNDSTAGE ORB */}
+      <div className="ambient-card rounded-[28px] p-6 sm:p-8 relative overflow-hidden flex flex-col items-center justify-center text-center space-y-6 shadow-sm border border-black/5 dark:border-white/5">
+        
+        {/* Subtle Ambient Radial Glow Behind Orb */}
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-64 h-64 bg-[#5e5ce6]/10 rounded-full blur-3xl pointer-events-none" />
+
+        {/* Central Pulsing Mic Orb */}
         <div className="relative">
           {isListening && (
-            <div className="absolute -inset-2 rounded-full bg-rose-500/30 animate-ping pointer-events-none" />
+            <div className="absolute -inset-4 rounded-full bg-rose-500/20 animate-ping pointer-events-none" />
           )}
           {isAiSpeaking && (
-            <div className="absolute -inset-2 rounded-full bg-indigo-500/30 animate-ping pointer-events-none" />
+            <div className="absolute -inset-4 rounded-full bg-[#5e5ce6]/25 animate-ping pointer-events-none" />
           )}
+          {loadingAi && (
+            <div className="absolute -inset-3 rounded-full border-2 border-dashed border-[#5e5ce6]/60 animate-spin pointer-events-none" />
+          )}
+
           <button
+            type="button"
             onClick={toggleMicListening}
-            className={`relative z-10 w-16 h-16 rounded-full flex items-center justify-center transition-all duration-300 active:scale-95 shadow-md ${
+            className={`relative z-10 w-24 h-24 rounded-full flex items-center justify-center transition-all duration-300 active:scale-95 shadow-md ${
               isListening
-                ? 'bg-rose-500 text-white shadow-rose-500/50 scale-105'
+                ? 'bg-rose-500 text-white shadow-rose-500/40 scale-105'
                 : isAiSpeaking
-                ? 'bg-gradient-to-tr from-purple-600 to-indigo-500 text-white shadow-indigo-500/50 animate-pulse'
-                : 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-indigo-600/40 hover:scale-105'
+                ? 'bg-[#5e5ce6] text-white shadow-[#5e5ce6]/40 scale-105'
+                : 'bg-[#1a1a1e] dark:bg-white text-white dark:text-[#1a1a1e] hover:scale-105 shadow-xl'
             }`}
-            title={isListening ? 'Stop Listening' : `Speak in ${activeLangConfig.name}`}
+            title={isListening ? 'Stop Listening' : `Tap to Speak in ${activeLangConfig.name}`}
           >
             {isListening ? (
-              <Mic className="w-7 h-7 animate-bounce" />
+              <Mic className="w-10 h-10 animate-pulse" />
+            ) : isAiSpeaking ? (
+              <Volume2 className="w-10 h-10 animate-bounce" />
+            ) : loadingAi ? (
+              <RefreshCw className="w-10 h-10 animate-spin text-[#5e5ce6]" />
             ) : (
-              <MicOff className="w-7 h-7" />
+              <Mic className="w-10 h-10 opacity-90 hover:opacity-100" />
             )}
           </button>
         </div>
 
-        {/* Status Label */}
-        <div>
-          <div className="text-xs font-bold flex items-center justify-center gap-1.5">
-            <span>{activeLangConfig.nativeName} ({activeLangConfig.name}) AI Voice</span>
-            {isAiSpeaking && (
-              <span className="text-[10px] bg-indigo-500/30 text-indigo-300 px-2 py-0.5 rounded-full font-mono">
-                Speaking
-              </span>
-            )}
-          </div>
-          <p className="text-[11px] text-slate-300 mt-0.5">
+        {/* Dynamic Status Indicator */}
+        <div className="space-y-1 z-10">
+          <div className="meta-tag text-slate-500 flex items-center justify-center gap-2">
+            <span
+              className={`w-2 h-2 rounded-full ${
+                isListening
+                  ? 'bg-rose-500 animate-pulse'
+                  : isAiSpeaking
+                  ? 'bg-[#5e5ce6] animate-pulse'
+                  : loadingAi
+                  ? 'bg-amber-500 animate-spin'
+                  : 'bg-emerald-500'
+              }`}
+            />
             {isListening
-              ? '🎙️ Listening... Speak now'
+              ? `LISTENING IN ${activeLangConfig.name.toUpperCase()}...`
               : isAiSpeaking
-              ? '🔊 Playing vocal response'
-              : 'Tap mic or type a message below'}
+              ? `PLAYING TALKBACK (${activeLangConfig.nativeName})`
+              : loadingAi
+              ? 'SYNTHESIZING RESPONSE...'
+              : `READY • ${activeLangConfig.nativeName} (${activeLangConfig.name.toUpperCase()})`}
+          </div>
+          <p className="text-xs text-slate-500 dark:text-slate-400">
+            {isListening
+              ? 'Speak clearly into your microphone now...'
+              : isAiSpeaking
+              ? 'Synthesizing voice playback. Click Stop to cancel.'
+              : 'Tap the microphone or choose a quick prompt below to interact.'}
           </p>
         </div>
 
-        {/* Audio Spectrum Bars */}
-        <div className="flex items-center gap-1 h-4 px-2.5 bg-slate-950/70 rounded-full border border-slate-800">
-          {[30, 75, 45, 90, 60, 85, 40].map((h, i) => (
+        {/* Real-time Acoustic Waveform Equalizer */}
+        <div className="flex items-center gap-1.5 h-8 px-4 bg-white/40 dark:bg-slate-950/40 rounded-full border border-black/5 dark:border-white/5 z-10">
+          {audioWaves.map((height, i) => (
             <div
               key={i}
-              className={`w-1 rounded-full transition-all duration-300 ${
-                isAiSpeaking || isListening ? 'bg-indigo-400' : 'bg-slate-700'
+              className={`w-1 rounded-full transition-all duration-150 ${
+                isListening
+                  ? 'bg-rose-500'
+                  : isAiSpeaking
+                  ? 'bg-[#5e5ce6]'
+                  : 'bg-slate-300 dark:bg-slate-700'
               }`}
-              style={{ height: isAiSpeaking || isListening ? `${h}%` : '20%' }}
+              style={{ height: `${height}%` }}
             />
           ))}
           {isAiSpeaking && (
             <button
+              type="button"
               onClick={stopAudio}
-              className="ml-1 text-[10px] text-rose-400 hover:text-rose-300 font-bold px-1"
+              className="ml-2 pl-2 border-l border-black/10 dark:border-white/10 text-[10px] font-geist-mono uppercase font-bold text-rose-500 hover:text-rose-600 flex items-center gap-1"
             >
+              <Square className="w-2.5 h-2.5 fill-current" />
               Stop
             </button>
           )}
         </div>
       </div>
 
-      {/* Preset Action Chips */}
-      <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5 scrollbar-none">
-        {activeLangConfig.presets.map((preset, idx) => (
-          <button
-            key={idx}
-            onClick={() => handleSendMessage(preset)}
-            disabled={loadingAi}
-            className="shrink-0 text-[11px] font-medium px-3 py-1.5 bg-white/80 dark:bg-slate-800/80 hover:bg-indigo-50 dark:hover:bg-indigo-950/60 text-slate-700 dark:text-slate-300 hover:text-indigo-600 dark:hover:text-indigo-400 rounded-xl border border-slate-200 dark:border-slate-700/80 shadow-2xs transition-all active:scale-95"
-          >
-            {preset}
-          </button>
-        ))}
+      {/* QUICK PROMPTS CHIPS */}
+      <div className="space-y-2">
+        <div className="meta-tag text-slate-400">SUGGESTED QUERIES ({activeLangConfig.nativeName})</div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
+          {activeLangConfig.presets.map((preset, idx) => (
+            <button
+              key={idx}
+              type="button"
+              onClick={() => handleSendMessage(preset.prompt)}
+              disabled={loadingAi}
+              className="ambient-card p-3 rounded-xl text-left border border-black/5 dark:border-white/5 hover:border-[#5e5ce6]/40 transition-all group flex items-start gap-2.5"
+            >
+              <div className="p-1.5 rounded-lg bg-[#5e5ce6]/10 text-[#5e5ce6] shrink-0 mt-0.5">
+                {preset.icon === 'search' ? (
+                  <Search className="w-3.5 h-3.5" />
+                ) : preset.icon === 'mail' ? (
+                  <Mail className="w-3.5 h-3.5" />
+                ) : (
+                  <Sparkles className="w-3.5 h-3.5" />
+                )}
+              </div>
+              <div className="min-w-0">
+                <div className="text-xs font-semibold text-[#1a1a1e] dark:text-white truncate group-hover:text-[#5e5ce6] transition-colors">
+                  {preset.label}
+                </div>
+                <div className="text-[11px] text-slate-500 truncate">{preset.prompt}</div>
+              </div>
+            </button>
+          ))}
+        </div>
       </div>
 
-      {/* Chat Conversation Stream */}
-      <div className="bg-white/90 dark:bg-slate-900/90 backdrop-blur-md border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xs flex flex-col h-[340px] overflow-hidden">
-        {/* Header */}
-        <div className="px-3.5 py-2 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/40 flex items-center justify-between text-xs font-semibold text-slate-700 dark:text-slate-300">
-          <div className="flex items-center gap-1.5">
-            <Bot className="w-3.5 h-3.5 text-indigo-600" />
-            <span>Voice Log ({activeLangConfig.nativeName})</span>
+      {/* CONVERSATION LOG CONTAINER */}
+      <div className="ambient-card rounded-[24px] overflow-hidden flex flex-col h-[480px] shadow-xs border border-black/5 dark:border-white/5">
+        
+        {/* Chat Stream Header */}
+        <div className="px-5 py-3.5 border-b border-black/5 dark:border-white/5 bg-black/[0.02] dark:bg-white/[0.02] flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Bot className="w-4 h-4 text-[#5e5ce6]" />
+            <span className="meta-tag text-slate-500">VOICE SESSION TRANSCRIPT</span>
           </div>
           <button
+            type="button"
             onClick={() =>
               setMessages([
                 {
@@ -521,98 +720,114 @@ export default function AiVoiceTalkback({ contacts }: AiVoiceTalkbackProps) {
                 },
               ])
             }
-            className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors flex items-center gap-1 text-[11px]"
+            className="text-xs font-geist-mono uppercase tracking-wider text-slate-400 hover:text-rose-500 transition-colors flex items-center gap-1.5"
           >
             <RotateCcw className="w-3 h-3" />
             Clear Log
           </button>
         </div>
 
-        {/* Message Bubble List */}
-        <div className="flex-1 overflow-y-auto p-3.5 space-y-3">
+        {/* Message Stream */}
+        <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4">
           {messages.map((msg) => (
             <div
               key={msg.id}
-              className={`flex items-start gap-2 ${msg.sender === 'user' ? 'flex-row-reverse' : ''}`}
+              className={`flex items-start gap-3 ${msg.sender === 'user' ? 'flex-row-reverse' : ''}`}
             >
+              {/* Avatar Pill */}
               <div
-                className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 text-xs font-bold shadow-2xs ${
+                className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 text-xs font-bold ${
                   msg.sender === 'user'
-                    ? 'bg-indigo-600 text-white'
-                    : 'bg-gradient-to-tr from-purple-600 to-indigo-600 text-white'
+                    ? 'bg-[#1a1a1e] dark:bg-white text-white dark:text-[#1a1a1e]'
+                    : 'bg-[#5e5ce6] text-white shadow-xs'
                 }`}
               >
-                {msg.sender === 'user' ? <User className="w-3 h-3" /> : <Bot className="w-3 h-3" />}
+                {msg.sender === 'user' ? <User className="w-4 h-4" /> : <Bot className="w-4 h-4" />}
               </div>
 
+              {/* Message Content Bubble */}
               <div
-                className={`max-w-[85%] rounded-2xl p-2.5 text-xs sm:text-sm space-y-1 shadow-2xs relative group ${
+                className={`max-w-[88%] sm:max-w-[80%] rounded-2xl p-4 text-xs sm:text-sm space-y-2 relative group ${
                   msg.sender === 'user'
-                    ? 'bg-indigo-600 text-white rounded-tr-none'
-                    : 'bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-100 rounded-tl-none border border-slate-200/60 dark:border-slate-700/60'
+                    ? 'bg-[#1a1a1e] text-white rounded-tr-none'
+                    : 'bg-white/60 dark:bg-slate-900/60 text-[#1a1a1e] dark:text-slate-100 rounded-tl-none border border-black/5 dark:border-white/5 shadow-2xs'
                 }`}
               >
-                <div className="whitespace-pre-wrap leading-relaxed">{msg.text}</div>
-                
-                <div className="flex items-center justify-between pt-1 border-t border-slate-200/40 dark:border-slate-700/40 text-[10px]">
-                  <div className="flex items-center gap-1.5">
+                {/* Formatted Markdown Content */}
+                <div className="prose prose-sm dark:prose-invert max-w-none text-xs sm:text-sm leading-relaxed">
+                  <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                    {msg.text}
+                  </ReactMarkdown>
+                </div>
+
+                {/* EMAIL DRAFT CALLOUT ACTION */}
+                {msg.sender === 'ai' && msg.emailDraft && onDraftToMailer && (
+                  <div className="mt-3 p-3 rounded-xl bg-[#5e5ce6]/10 border border-[#5e5ce6]/20 flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <Mail className="w-4 h-4 text-[#5e5ce6] shrink-0" />
+                      <div className="truncate text-xs">
+                        <span className="font-semibold text-[#5e5ce6]">Draft Generated:</span>{' '}
+                        <span className="text-slate-600 dark:text-slate-300">{msg.emailDraft.subject || 'Message Draft'}</span>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleTransferToMailer(msg.emailDraft)}
+                      className="px-3 py-1.5 bg-[#5e5ce6] hover:bg-[#5e5ce6]/90 text-white font-geist-mono text-[11px] font-semibold uppercase tracking-wider rounded-lg shrink-0 flex items-center gap-1 shadow-2xs transition-all active:scale-95"
+                    >
+                      <span>Open in Mailer</span>
+                      <ArrowRight className="w-3 h-3" />
+                    </button>
+                  </div>
+                )}
+
+                {/* Actions & Metadata Footer */}
+                <div className="flex items-center justify-between pt-2 border-t border-black/5 dark:border-white/5 text-[11px] font-geist-mono">
+                  <div className="flex items-center gap-2">
                     {msg.sender === 'ai' && (
                       <button
+                        type="button"
                         onClick={() => speakResponseSarvam(msg.text)}
-                        className="px-1.5 py-0.5 rounded bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 hover:bg-indigo-100 hover:text-indigo-600 transition-colors flex items-center gap-1"
-                        title="Replay Speech"
+                        className="px-2 py-1 rounded-lg bg-black/5 dark:bg-white/5 hover:bg-[#5e5ce6]/10 hover:text-[#5e5ce6] text-slate-600 dark:text-slate-400 transition-colors flex items-center gap-1"
+                        title="Vocalize this message"
                       >
-                        <Play className="w-2.5 h-2.5" />
-                        <span>Replay</span>
+                        <Play className="w-3 h-3" />
+                        <span>Speak</span>
                       </button>
                     )}
+
                     <button
+                      type="button"
                       onClick={() => copyMessageText(msg.id, msg.text)}
-                      className="px-1.5 py-0.5 rounded bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-300 transition-colors flex items-center gap-1"
-                      title="Copy text"
+                      className="px-2 py-1 rounded-lg bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 text-slate-600 dark:text-slate-400 transition-colors flex items-center gap-1"
+                      title="Copy response"
                     >
                       {copiedMsgId === msg.id ? (
-                        <Check className="w-2.5 h-2.5 text-emerald-500" />
+                        <Check className="w-3 h-3 text-emerald-500" />
                       ) : (
-                        <Copy className="w-2.5 h-2.5" />
+                        <Copy className="w-3 h-3" />
                       )}
                       <span>{copiedMsgId === msg.id ? 'Copied' : 'Copy'}</span>
                     </button>
                   </div>
 
-                  <div className="flex items-center gap-1.5 font-mono">
-                    {msg.sender === 'ai' && msg.source && (
-                      <span className={`text-[9px] px-1 py-0.2 rounded font-sans font-medium ${
-                        msg.source === 'groq'
-                          ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20'
-                          : msg.source === 'gemini'
-                          ? 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20'
-                          : 'bg-slate-200 dark:bg-slate-700 text-slate-500'
-                      }`}>
-                        {msg.source === 'groq' ? '⚡ Groq' : msg.source === 'gemini' ? '✦ Gemini' : 'Local'}
-                      </span>
-                    )}
-                    <span
-                      className={`${
-                        msg.sender === 'user' ? 'text-indigo-200' : 'text-slate-400 dark:text-slate-500'
-                      }`}
-                    >
-                      {msg.timestamp}
-                    </span>
-                  </div>
+                  <span className="text-slate-400 dark:text-slate-500 text-[10px]">
+                    {msg.timestamp}
+                  </span>
                 </div>
               </div>
             </div>
           ))}
 
+          {/* AI Generating Indicator */}
           {loadingAi && (
-            <div className="flex items-start gap-2">
-              <div className="w-6 h-6 rounded-full bg-gradient-to-tr from-purple-600 to-indigo-600 text-white flex items-center justify-center shrink-0">
-                <Bot className="w-3 h-3 animate-bounce" />
+            <div className="flex items-start gap-3">
+              <div className="w-8 h-8 rounded-full bg-[#5e5ce6] text-white flex items-center justify-center shrink-0">
+                <Bot className="w-4 h-4 animate-bounce" />
               </div>
-              <div className="bg-slate-100 dark:bg-slate-800 p-2.5 rounded-2xl text-xs text-slate-500 flex items-center gap-2">
-                <RefreshCw className="w-3.5 h-3.5 animate-spin text-indigo-500" />
-                <span>AI generating response...</span>
+              <div className="bg-white/60 dark:bg-slate-900/60 p-3.5 rounded-2xl text-xs text-slate-500 flex items-center gap-2 border border-black/5 dark:border-white/5">
+                <RefreshCw className="w-3.5 h-3.5 animate-spin text-[#5e5ce6]" />
+                <span className="font-geist-mono">Reasoning across contact database...</span>
               </div>
             </div>
           )}
@@ -621,15 +836,16 @@ export default function AiVoiceTalkback({ contacts }: AiVoiceTalkbackProps) {
         </div>
 
         {/* Input Bar */}
-        <div className="p-2.5 bg-slate-50 dark:bg-slate-800/80 border-t border-slate-200 dark:border-slate-800 flex items-center gap-2">
+        <div className="p-3 sm:p-4 bg-black/[0.02] dark:bg-white/[0.02] border-t border-black/5 dark:border-white/5 flex items-center gap-2">
           <button
+            type="button"
             onClick={toggleMicListening}
-            className={`p-2 rounded-xl transition-all shadow-xs flex items-center gap-1 ${
+            className={`p-3 rounded-xl transition-all shadow-xs flex items-center justify-center shrink-0 ${
               isListening
                 ? 'bg-rose-500 text-white animate-pulse'
-                : 'bg-indigo-100 dark:bg-indigo-950/80 text-indigo-600 dark:text-indigo-300 hover:bg-indigo-200'
+                : 'bg-black/5 dark:bg-white/5 text-[#5e5ce6] hover:bg-black/10 dark:hover:bg-white/10'
             }`}
-            title={isListening ? 'Stop Listening' : `Speak in ${activeLangConfig.nativeName}`}
+            title={isListening ? 'Stop Mic' : `Speak in ${activeLangConfig.name}`}
           >
             {isListening ? <Mic className="w-4 h-4" /> : <MicOff className="w-4 h-4" />}
           </button>
@@ -642,16 +858,17 @@ export default function AiVoiceTalkback({ contacts }: AiVoiceTalkbackProps) {
             placeholder={
               isListening
                 ? `Listening in ${activeLangConfig.nativeName}...`
-                : `Type or speak in ${activeLangConfig.nativeName}...`
+                : `Type or dictate a prompt in ${activeLangConfig.nativeName}...`
             }
             disabled={loadingAi}
-            className="flex-1 px-3 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs sm:text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:border-indigo-500"
+            className="flex-1 px-4 py-3 bg-white/50 dark:bg-slate-950/40 border border-black/10 dark:border-white/10 rounded-xl text-xs sm:text-sm text-[#1a1a1e] dark:text-slate-100 placeholder:text-slate-400 focus:outline-none focus:border-[#5e5ce6] font-mono"
           />
 
           <button
+            type="button"
             onClick={() => handleSendMessage()}
             disabled={loadingAi || !inputPrompt.trim()}
-            className="px-3 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded-xl shadow-xs disabled:opacity-50 transition-all flex items-center gap-1.5"
+            className="px-5 py-3 bg-[#1a1a1e] dark:bg-white hover:bg-black/90 dark:hover:bg-slate-100 text-white dark:text-[#1a1a1e] text-xs font-semibold uppercase tracking-wider font-geist-mono rounded-xl shadow-xs disabled:opacity-40 transition-all flex items-center gap-1.5 shrink-0"
           >
             <Send className="w-3.5 h-3.5" />
             <span className="hidden sm:inline">Send</span>
@@ -661,5 +878,3 @@ export default function AiVoiceTalkback({ contacts }: AiVoiceTalkbackProps) {
     </div>
   );
 }
-
-

@@ -10,17 +10,17 @@ import {
   Search,
   Check,
   X,
-  Contact as ContactIcon,
-  Code2,
-  Copy,
   Send,
   Users,
   ShieldCheck,
-  CheckCircle2,
   Radio,
+  Sparkles,
+  ArrowRight,
+  ShieldAlert,
+  SlidersHorizontal,
 } from 'lucide-react';
 import { Contact } from './types';
-import { getAvatarColor, getInitials } from './utils/storage';
+import { getInitials } from './utils/storage';
 import { supabase } from './lib/supabase';
 import MarkdownEmailComposer from './components/MarkdownEmailComposer';
 import GlassmorphismOtpModal from './components/GlassmorphismOtpModal';
@@ -38,11 +38,17 @@ export default function App() {
   const [email, setEmail] = useState('');
   const [editingId, setEditingId] = useState<string | null>(null);
 
-  // Search state
+  // Search & Filter state
   const [searchQuery, setSearchQuery] = useState('');
+  const [filterType, setFilterType] = useState<'all' | 'verified' | 'has_email' | 'has_phone'>('all');
 
   // Form & Supabase error messages
   const [formError, setFormError] = useState('');
+
+  // Target email and content for quick compose prefill
+  const [prefilledEmail, setPrefilledEmail] = useState('');
+  const [prefilledSubject, setPrefilledSubject] = useState('');
+  const [prefilledMarkdown, setPrefilledMarkdown] = useState('');
 
   // OTP Verification States
   const [verifiedEmails, setVerifiedEmails] = useState<string[]>([]);
@@ -78,7 +84,7 @@ export default function App() {
 
       if (error) {
         console.error('Supabase fetch error:', error);
-        setFormError(`Supabase fetch warning: ${error.message}`);
+        setFormError(`Supabase notice: ${error.message}`);
         setContacts([]);
       } else if (data) {
         const formatted: Contact[] = data
@@ -229,10 +235,14 @@ export default function App() {
     }
   };
 
-  const [filterType, setFilterType] = useState<'all' | 'verified' | 'has_email' | 'has_phone'>('all');
+  const handleQuickCompose = (targetEmail?: string) => {
+    if (targetEmail) {
+      setPrefilledEmail(targetEmail);
+    }
+    setActiveTab('mailer');
+  };
 
   const filteredContacts = contacts.filter((c) => {
-    // First apply filterType
     if (filterType === 'verified') {
       if (!c.email || !verifiedEmails.includes(c.email.toLowerCase().trim())) return false;
     } else if (filterType === 'has_email') {
@@ -241,7 +251,6 @@ export default function App() {
       if (!c.phone) return false;
     }
 
-    // Then apply searchQuery
     const q = searchQuery.toLowerCase().trim();
     if (!q) return true;
     return (
@@ -256,409 +265,482 @@ export default function App() {
   const emailableCount = contacts.filter((c) => c.email && c.email.includes('@')).length;
 
   return (
-    <div className="relative min-h-screen bg-[#eef2f7] dark:bg-[#0f172a] text-[#0f172a] dark:text-slate-100 font-sans antialiased pb-28 pt-4 px-3 sm:px-6 overflow-hidden">
-      {/* Soft Abstract Gradient Flow Background Effects */}
-      <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden">
-        <div className="absolute -top-20 -left-20 w-96 h-96 bg-gradient-to-br from-indigo-300/40 via-purple-300/30 to-pink-300/20 dark:from-indigo-900/30 dark:via-purple-900/20 dark:to-pink-900/10 rounded-full blur-3xl animate-pulse" />
-        <div className="absolute top-1/3 -right-20 w-96 h-96 bg-gradient-to-bl from-cyan-300/30 via-blue-300/30 to-indigo-300/20 dark:from-cyan-900/20 dark:via-blue-900/20 dark:to-indigo-900/10 rounded-full blur-3xl animate-pulse duration-1000" />
-        <div className="absolute -bottom-20 left-1/4 w-96 h-96 bg-gradient-to-tr from-purple-300/30 via-pink-300/20 to-amber-200/20 dark:from-purple-900/20 dark:via-pink-900/10 dark:to-amber-900/10 rounded-full blur-3xl animate-pulse duration-700" />
-      </div>
-
-      {/* MOBILE APP CONTAINER FRAME */}
-      <div className="relative z-10 max-w-md mx-auto space-y-4">
+    <div className="min-h-screen text-[#1a1a1e] dark:text-[#f8fafc] flex flex-col justify-between p-3 sm:p-6 lg:p-8">
+      {/* AMBIENT MINIMALIST SHELL */}
+      <div className="w-full max-w-[1600px] mx-auto min-h-[calc(100vh-3rem)] flex flex-col gap-6">
         
-        {/* COMPACT APP HEADER */}
-        <div className="flex items-center justify-between px-2 pt-1 pb-1">
-          <h1 className="text-lg font-black tracking-tight text-[#0f172a] dark:text-white flex items-center gap-2">
-            <span>Contacts & Mailer</span>
-          </h1>
-        </div>
-
-        {/* TAB 1: SAVED CONTACTS DIRECTORY */}
-        {activeTab === 'saved' && (
-          <div className="space-y-4">
-            
-            {/* Search Bar with Neumorphic Inset Shadow */}
-            <div className="relative">
-              <Search className="w-4 h-4 absolute left-4 top-3.5 text-slate-400" />
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search contacts by name, city, or email..."
-                className="w-full pl-11 pr-9 py-3 rounded-2xl bg-[#eef2f7] dark:bg-[#1e293b] shadow-[inset_3px_3px_6px_#d1d9e6,inset_-3px_-3px_6px_#ffffff] dark:shadow-[inset_3px_3px_6px_#0b101d,inset_-3px_-3px_6px_#2b3953] border border-white/40 dark:border-slate-800 text-xs text-[#0f172a] dark:text-slate-100 placeholder-slate-400 focus:outline-none transition-all"
-              />
-              {searchQuery && (
-                <button
-                  onClick={() => setSearchQuery('')}
-                  className="absolute right-3.5 top-3.5 text-slate-400 hover:text-slate-600"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              )}
+        {/* TOP HEADER COMPONENT */}
+        <header className="ambient-glass rounded-[24px] sm:rounded-[28px] p-4 sm:p-6 lg:px-8 lg:py-5 flex flex-col xl:flex-row xl:items-center justify-between gap-4 sm:gap-6 shadow-xl border border-black/5 dark:border-white/5">
+          {/* BRANDING */}
+          <div className="flex items-center justify-between gap-4">
+            <div className="space-y-0.5">
+              <h1 className="text-2xl sm:text-3xl font-light tracking-tighter text-[#1a1a1e] dark:text-white flex items-center gap-2">
+                <span>Contacts</span>
+                <span className="text-[#5e5ce6] font-normal">& Mailer</span>
+              </h1>
+              <p className="text-xs text-slate-500 dark:text-slate-400 font-mono tracking-tight">
+                Ambient directory & SMTP dispatcher
+              </p>
             </div>
-
-            {/* Quick Filter Pills */}
-            <div className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar">
-              <button
-                type="button"
-                onClick={() => setFilterType('all')}
-                className={`px-3.5 py-1.5 rounded-full text-xs font-bold transition-all shrink-0 ${
-                  filterType === 'all'
-                    ? 'bg-indigo-600 text-white shadow-md'
-                    : 'bg-[#eef2f7] dark:bg-[#1e293b] text-slate-600 dark:text-slate-300 shadow-[3px_3px_7px_#d1d9e6,-3px_-3px_7px_#ffffff] dark:shadow-[3px_3px_7px_#0b101d,-3px_-3px_7px_#2b3953]'
-                }`}
-              >
-                All ({contacts.length})
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setFilterType('verified')}
-                className={`px-3.5 py-1.5 rounded-full text-xs font-bold transition-all shrink-0 ${
-                  filterType === 'verified'
-                    ? 'bg-emerald-600 text-white shadow-md'
-                    : 'bg-[#eef2f7] dark:bg-[#1e293b] text-slate-600 dark:text-slate-300 shadow-[3px_3px_7px_#d1d9e6,-3px_-3px_7px_#ffffff] dark:shadow-[3px_3px_7px_#0b101d,-3px_-3px_7px_#2b3953]'
-                }`}
-              >
-                Verified OTP ({verifiedCount})
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setFilterType('has_email')}
-                className={`px-3.5 py-1.5 rounded-full text-xs font-bold transition-all shrink-0 ${
-                  filterType === 'has_email'
-                    ? 'bg-purple-600 text-white shadow-md'
-                    : 'bg-[#eef2f7] dark:bg-[#1e293b] text-slate-600 dark:text-slate-300 shadow-[3px_3px_7px_#d1d9e6,-3px_-3px_7px_#ffffff] dark:shadow-[3px_3px_7px_#0b101d,-3px_-3px_7px_#2b3953]'
-                }`}
-              >
-                Has Email ({emailableCount})
-              </button>
-            </div>
-
-            {/* CATEGORIZED SCROLLABLE LIST OF CONTACT CARDS */}
-            {loading ? (
-              <div className="p-8 text-center rounded-2xl bg-[#eef2f7] dark:bg-[#1e293b] shadow-[inset_2px_2px_5px_#d1d9e6,inset_-2px_-2px_5px_#ffffff] text-xs text-slate-400">
-                Loading contacts from Supabase...
-              </div>
-            ) : filteredContacts.length > 0 ? (
-              <div className="space-y-3">
-                {filteredContacts.map((c) => {
-                  const avatar = getAvatarColor(c.name);
-                  const initials = getInitials(c.name);
-                  const isVerified = c.email && verifiedEmails.includes(c.email.toLowerCase().trim());
-
-                  return (
-                    <div
-                      key={c.id}
-                      className="p-4 rounded-[22px] bg-[#eef2f7] dark:bg-[#1e293b] shadow-[6px_6px_14px_#d1d9e6,-6px_-6px_14px_#ffffff] dark:shadow-[6px_6px_14px_#0b101d,-6px_-6px_14px_#2b3953] border border-white/60 dark:border-slate-800/60 transition-all flex flex-col justify-between gap-3"
-                    >
-                      <div className="flex items-start gap-3">
-                        {/* Circular Avatar with soft drop shadow & status dot */}
-                        <div className="relative shrink-0">
-                          <div
-                            className={`w-11 h-11 rounded-full flex items-center justify-center font-bold text-xs shadow-md ${avatar.bg} ${avatar.text}`}
-                          >
-                            {initials}
-                          </div>
-                          {isVerified ? (
-                            <span className="absolute -bottom-0.5 -right-0.5 w-4 h-4 bg-emerald-500 rounded-full flex items-center justify-center text-white border-2 border-[#eef2f7]">
-                              <Check className="w-2.5 h-2.5 stroke-[3]" />
-                            </span>
-                          ) : (
-                            <span className="absolute bottom-0 right-0 w-3 h-3 bg-slate-400 rounded-full border-2 border-[#eef2f7]" />
-                          )}
-                        </div>
-
-                        <div className="min-w-0 flex-1 space-y-1">
-                          <div className="flex items-center justify-between gap-2">
-                            <h3 className="font-bold text-sm text-[#0f172a] dark:text-white truncate">
-                              {c.name}
-                            </h3>
-
-                            <div className="flex items-center gap-1">
-                              <button
-                                onClick={() => handleEdit(c)}
-                                className="p-1.5 text-slate-400 hover:text-indigo-600 rounded-full hover:bg-indigo-50 dark:hover:bg-slate-800 transition-colors"
-                                title="Edit Contact"
-                              >
-                                <Edit2 className="w-3.5 h-3.5" />
-                              </button>
-                              <button
-                                onClick={() => handleDelete(c.id)}
-                                className="p-1.5 text-slate-400 hover:text-rose-600 rounded-full hover:bg-rose-50 dark:hover:bg-slate-800 transition-colors"
-                                title="Delete Contact"
-                              >
-                                <Trash2 className="w-3.5 h-3.5" />
-                              </button>
-                            </div>
-                          </div>
-
-                          <div className="space-y-1 text-xs text-slate-600 dark:text-slate-300">
-                            <div className="flex items-center gap-1.5 font-mono">
-                              <Phone className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
-                              <span>{c.phone}</span>
-                            </div>
-
-                            <div className="flex items-center gap-1.5">
-                              <MapPin className="w-3.5 h-3.5 text-rose-500 shrink-0" />
-                              <span className="truncate">{c.place}</span>
-                            </div>
-
-                            {c.email ? (
-                              <div className="flex items-center gap-1.5 pt-0.5">
-                                <Mail className="w-3.5 h-3.5 text-indigo-500 shrink-0" />
-                                <span className="truncate text-indigo-600 dark:text-indigo-400 font-medium">
-                                  {c.email}
-                                </span>
-                                {isVerified ? (
-                                  <span className="inline-flex items-center gap-1 text-[10px] bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 px-2 py-0.5 rounded-full font-bold ml-auto shrink-0">
-                                    <ShieldCheck className="w-3 h-3 text-emerald-500" />
-                                    OTP Verified
-                                  </span>
-                                ) : (
-                                  <button
-                                    onClick={() => handleOpenOtpModal(c.email!)}
-                                    className="ml-auto text-[10px] text-indigo-600 hover:text-indigo-700 bg-indigo-50 dark:bg-indigo-950 px-2 py-0.5 rounded-full font-bold border border-indigo-200 dark:border-indigo-800 transition-colors shrink-0"
-                                  >
-                                    Verify OTP
-                                  </button>
-                                )}
-                              </div>
-                            ) : (
-                              <div className="text-[11px] text-slate-400 italic">No email address</div>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-
-                      {c.email && (
-                        <div className="pt-2 border-t border-slate-200/50 dark:border-slate-800 flex items-center justify-end">
-                          <button
-                            onClick={() => setActiveTab('mailer')}
-                            className="text-xs text-indigo-600 hover:text-indigo-700 dark:text-indigo-400 font-bold flex items-center gap-1"
-                          >
-                            <Send className="w-3 h-3" />
-                            <span>Compose Email →</span>
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            ) : (
-              <div className="p-8 text-center rounded-[24px] bg-[#eef2f7] dark:bg-[#1e293b] shadow-[6px_6px_14px_#d1d9e6,-6px_-6px_14px_#ffffff] text-slate-400">
-                <ContactIcon className="w-8 h-8 text-slate-300 mx-auto mb-2" />
-                <div className="text-xs font-bold text-slate-700 dark:text-slate-300">
-                  {searchQuery ? 'No contacts match search' : 'No contacts saved yet'}
-                </div>
-                <button
-                  onClick={() => setActiveTab('contacts')}
-                  className="mt-3 px-4 py-2 bg-indigo-600 text-white text-xs font-bold rounded-full shadow-md"
-                >
-                  Add Contact Now
-                </button>
-              </div>
-            )}
           </div>
-        )}
 
-        {/* TAB 2: ADD / EDIT CONTACT FORM */}
-        {activeTab === 'contacts' && (
-          <div className="p-5 rounded-[24px] bg-[#eef2f7] dark:bg-[#1e293b] shadow-[6px_6px_14px_#d1d9e6,-6px_-6px_14px_#ffffff] dark:shadow-[6px_6px_14px_#0b101d,-6px_-6px_14px_#2b3953] border border-white/60 dark:border-slate-800/60 space-y-4">
-            <div className="flex items-center justify-between border-b border-slate-200/60 dark:border-slate-800 pb-3">
-              <h2 className="text-sm font-bold text-[#0f172a] dark:text-white flex items-center gap-2">
-                {editingId ? <Edit2 className="w-4 h-4 text-indigo-600" /> : <Plus className="w-4 h-4 text-indigo-600" />}
-                <span>{editingId ? 'Edit Contact' : 'Add New Contact'}</span>
-              </h2>
+          {/* NAVIGATION TABS IN HEADER */}
+          <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+            <nav className="flex flex-wrap items-center gap-1.5 sm:gap-2 bg-black/5 dark:bg-white/5 p-1.5 rounded-2xl w-full sm:w-auto">
               <button
                 type="button"
                 onClick={() => setActiveTab('saved')}
-                className="text-xs text-indigo-600 font-semibold"
+                className={`flex items-center gap-2 px-3.5 sm:px-4 py-2.5 rounded-xl font-medium text-xs transition-all ${
+                  activeTab === 'saved'
+                    ? 'bg-[#1a1a1e] text-white dark:bg-white dark:text-[#1a1a1e] shadow-md font-semibold'
+                    : 'text-slate-600 dark:text-slate-300 hover:bg-black/5 dark:hover:bg-white/5'
+                }`}
               >
-                Back to Directory →
+                <Users className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                <span>Directory</span>
+                <span className="font-geist-mono text-[10px] px-1.5 py-0.5 rounded-md bg-black/10 dark:bg-white/10 opacity-80">
+                  {contacts.length}
+                </span>
               </button>
-            </div>
 
-            <form onSubmit={handleSubmit} className="space-y-3.5">
-              {formError && (
-                <p className="text-xs text-rose-600 bg-rose-50 p-2.5 rounded-xl border border-rose-200">
-                  {formError}
-                </p>
-              )}
+              <button
+                type="button"
+                onClick={() => {
+                  handleCancelEdit();
+                  setActiveTab('contacts');
+                }}
+                className={`flex items-center gap-2 px-3.5 sm:px-4 py-2.5 rounded-xl font-medium text-xs transition-all ${
+                  activeTab === 'contacts'
+                    ? 'bg-[#1a1a1e] text-white dark:bg-white dark:text-[#1a1a1e] shadow-md font-semibold'
+                    : 'text-slate-600 dark:text-slate-300 hover:bg-black/5 dark:hover:bg-white/5'
+                }`}
+              >
+                <Plus className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                <span>{editingId ? 'Edit Contact' : 'Add Contact'}</span>
+                <span className="font-geist-mono text-[10px] px-1.5 py-0.5 rounded-md bg-black/10 dark:bg-white/10 opacity-80">
+                  {editingId ? 'EDIT' : 'NEW'}
+                </span>
+              </button>
 
-              {/* Name Input */}
-              <div>
-                <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1">
-                  Name *
-                </label>
+              <button
+                type="button"
+                onClick={() => setActiveTab('mailer')}
+                className={`flex items-center gap-2 px-3.5 sm:px-4 py-2.5 rounded-xl font-medium text-xs transition-all ${
+                  activeTab === 'mailer'
+                    ? 'bg-[#1a1a1e] text-white dark:bg-white dark:text-[#1a1a1e] shadow-md font-semibold'
+                    : 'text-slate-600 dark:text-slate-300 hover:bg-black/5 dark:hover:bg-white/5'
+                }`}
+              >
+                <Send className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                <span>Markdown Mailer</span>
+                <span className="font-geist-mono text-[10px] px-1.5 py-0.5 rounded-md bg-black/10 dark:bg-white/10 opacity-80">
+                  SMTP
+                </span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setActiveTab('talkback')}
+                className={`flex items-center gap-2 px-3.5 sm:px-4 py-2.5 rounded-xl font-medium text-xs transition-all ${
+                  activeTab === 'talkback'
+                    ? 'bg-[#5e5ce6] text-white shadow-md font-semibold'
+                    : 'text-[#5e5ce6] dark:text-indigo-400 hover:bg-[#5e5ce6]/10'
+                }`}
+              >
+                <Radio className="w-3.5 h-3.5 sm:w-4 sm:h-4 animate-spin text-cyan-300" />
+                <span>AI Voice Talkback</span>
+                <span className="font-geist-mono text-[10px] bg-white/20 px-1.5 py-0.5 rounded-md">
+                  LIVE
+                </span>
+              </button>
+            </nav>
+          </div>
+        </header>
+
+        {/* MAIN VIEW PANEL */}
+        <main className="ambient-glass rounded-[28px] p-6 sm:p-8 lg:p-10 flex flex-col gap-6 shadow-xl relative overflow-y-auto flex-1">
+          
+          {/* VIEW: DIRECTORY / CONTACTS */}
+          {activeTab === 'saved' && (
+            <div className="space-y-6 flex-1 flex flex-col">
+              
+              {/* SEARCH WRAPPER */}
+              <div className="space-y-3">
                 <div className="relative">
-                  <User className="w-4 h-4 absolute left-3.5 top-3 text-slate-400" />
                   <input
                     type="text"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    placeholder="Jane Doe"
-                    required
-                    className="w-full pl-10 pr-3 py-2.5 rounded-2xl bg-[#eef2f7] dark:bg-[#1e293b] shadow-[inset_2px_2px_5px_#d1d9e6,inset_-2px_-2px_5px_#ffffff] border border-white/40 text-xs text-[#0f172a] dark:text-slate-100 focus:outline-none"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="SEARCH DIRECTORY..."
+                    className="w-full bg-white/50 dark:bg-slate-950/40 border border-black/8 dark:border-white/10 px-5 py-4 pl-12 rounded-xl font-geist-mono text-xs tracking-wider uppercase text-[#1a1a1e] dark:text-slate-100 placeholder:text-slate-400 focus:outline-none focus:border-[#5e5ce6] transition-all shadow-inner"
                   />
-                </div>
-              </div>
-
-              {/* Phone Input */}
-              <div>
-                <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1">
-                  Phone Number *
-                </label>
-                <div className="relative">
-                  <Phone className="w-4 h-4 absolute left-3.5 top-3 text-slate-400" />
-                  <input
-                    type="tel"
-                    value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
-                    placeholder="+1 555 0192"
-                    required
-                    className="w-full pl-10 pr-3 py-2.5 rounded-2xl bg-[#eef2f7] dark:bg-[#1e293b] shadow-[inset_2px_2px_5px_#d1d9e6,inset_-2px_-2px_5px_#ffffff] border border-white/40 text-xs text-[#0f172a] dark:text-slate-100 focus:outline-none"
-                  />
-                </div>
-              </div>
-
-              {/* Location Input */}
-              <div>
-                <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1">
-                  City / Location *
-                </label>
-                <div className="relative">
-                  <MapPin className="w-4 h-4 absolute left-3.5 top-3 text-slate-400" />
-                  <input
-                    type="text"
-                    value={place}
-                    onChange={(e) => setPlace(e.target.value)}
-                    placeholder="New York, NY"
-                    required
-                    className="w-full pl-10 pr-3 py-2.5 rounded-2xl bg-[#eef2f7] dark:bg-[#1e293b] shadow-[inset_2px_2px_5px_#d1d9e6,inset_-2px_-2px_5px_#ffffff] border border-white/40 text-xs text-[#0f172a] dark:text-slate-100 focus:outline-none"
-                  />
-                </div>
-              </div>
-
-              {/* Email Input */}
-              <div>
-                <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1">
-                  Email Address (Optional)
-                </label>
-                <div className="relative flex items-center gap-2">
-                  <div className="relative flex-1">
-                    <Mail className="w-4 h-4 absolute left-3.5 top-3 text-slate-400" />
-                    <input
-                      type="email"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      placeholder="jane@example.com"
-                      className="w-full pl-10 pr-3 py-2.5 rounded-2xl bg-[#eef2f7] dark:bg-[#1e293b] shadow-[inset_2px_2px_5px_#d1d9e6,inset_-2px_-2px_5px_#ffffff] border border-white/40 text-xs text-[#0f172a] dark:text-slate-100 focus:outline-none"
-                    />
-                  </div>
-                  {email.trim().includes('@') && !verifiedEmails.includes(email.toLowerCase().trim()) && (
+                  <Search className="w-4 h-4 text-slate-400 absolute left-4 top-4" />
+                  {searchQuery && (
                     <button
-                      type="button"
-                      onClick={() => handleOpenOtpModal(email)}
-                      className="px-3 py-2.5 bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-bold text-xs rounded-2xl shadow-md shrink-0"
+                      onClick={() => setSearchQuery('')}
+                      className="absolute right-4 top-4 text-slate-400 hover:text-slate-600"
                     >
-                      Verify OTP
+                      <X className="w-4 h-4" />
                     </button>
                   )}
                 </div>
-              </div>
 
-              <div className="flex items-center justify-end gap-2 pt-2">
-                {editingId && (
+                {/* FILTER PILLS */}
+                <div className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar text-xs font-geist-mono">
                   <button
                     type="button"
-                    onClick={handleCancelEdit}
-                    className="px-4 py-2 text-xs font-semibold text-slate-500"
+                    onClick={() => setFilterType('all')}
+                    className={`px-3.5 py-1.5 rounded-lg transition-all tracking-wider text-[11px] uppercase ${
+                      filterType === 'all'
+                        ? 'bg-[#1a1a1e] text-white dark:bg-white dark:text-[#1a1a1e] font-semibold shadow-sm'
+                        : 'bg-white/40 dark:bg-slate-900/40 text-slate-600 dark:text-slate-400 border border-black/5 dark:border-white/5 hover:bg-white/70'
+                    }`}
                   >
-                    Cancel
+                    ALL ({contacts.length})
                   </button>
-                )}
+
+                  <button
+                    type="button"
+                    onClick={() => setFilterType('verified')}
+                    className={`px-3.5 py-1.5 rounded-lg transition-all tracking-wider text-[11px] uppercase flex items-center gap-1.5 ${
+                      filterType === 'verified'
+                        ? 'bg-emerald-600 text-white font-semibold shadow-sm'
+                        : 'bg-white/40 dark:bg-slate-900/40 text-slate-600 dark:text-slate-400 border border-black/5 dark:border-white/5 hover:bg-white/70'
+                    }`}
+                  >
+                    <ShieldCheck className="w-3 h-3 text-emerald-500" />
+                    VERIFIED ({verifiedCount})
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setFilterType('has_email')}
+                    className={`px-3.5 py-1.5 rounded-lg transition-all tracking-wider text-[11px] uppercase flex items-center gap-1.5 ${
+                      filterType === 'has_email'
+                        ? 'bg-[#5e5ce6] text-white font-semibold shadow-sm'
+                        : 'bg-white/40 dark:bg-slate-900/40 text-slate-600 dark:text-slate-400 border border-black/5 dark:border-white/5 hover:bg-white/70'
+                    }`}
+                  >
+                    <Mail className="w-3 h-3 text-[#5e5ce6]" />
+                    HAS EMAIL ({emailableCount})
+                  </button>
+                </div>
+              </div>
+
+              {/* CONTACT GRID */}
+              {loading ? (
+                <div className="p-12 text-center rounded-2xl bg-white/30 dark:bg-slate-900/30 border border-black/5 dark:border-white/5 font-geist-mono text-xs text-slate-400">
+                  FETCHING_SUPABASE_RECORDS...
+                </div>
+              ) : filteredContacts.length > 0 ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 auto-rows-fr">
+                  {filteredContacts.map((c) => {
+                    const initials = getInitials(c.name);
+                    const isVerified = c.email && verifiedEmails.includes(c.email.toLowerCase().trim());
+
+                    return (
+                      <div
+                        key={c.id}
+                        className="ambient-card p-5 rounded-2xl flex flex-col justify-between gap-4 hover:bg-white/80 dark:hover:bg-slate-900/80 hover:border-[#5e5ce6]/40 hover:-translate-y-0.5 transition-all duration-200 shadow-sm group"
+                      >
+                        <div className="flex items-start gap-4">
+                          {/* AVATAR */}
+                          <div className="relative shrink-0">
+                            <div className="w-14 h-14 rounded-xl bg-[#1a1a1e] dark:bg-white text-[#fdfcfb] dark:text-[#1a1a1e] flex items-center justify-center font-geist-mono font-semibold text-lg shadow-sm">
+                              {initials}
+                            </div>
+                            {isVerified && (
+                              <span className="absolute -bottom-1 -right-1 w-5 h-5 bg-emerald-500 rounded-full flex items-center justify-center text-white border-2 border-white dark:border-slate-900 shadow-sm">
+                                <Check className="w-3 h-3 stroke-[3]" />
+                              </span>
+                            )}
+                          </div>
+
+                          {/* CONTENT DETAILS */}
+                          <div className="min-w-0 flex-1 space-y-1">
+                            <div className="meta-tag text-slate-400 dark:text-slate-500 truncate">
+                              {c.place.toUpperCase()} / {c.phone}
+                            </div>
+                            <h3 className="font-semibold text-base text-[#1a1a1e] dark:text-white truncate leading-tight">
+                              {c.name}
+                            </h3>
+                            {c.email ? (
+                              <div className="font-geist-mono text-xs text-[#5e5ce6] dark:text-indigo-400 truncate flex items-center gap-1 pt-0.5">
+                                <Mail className="w-3 h-3 shrink-0" />
+                                <span className="truncate">{c.email}</span>
+                              </div>
+                            ) : (
+                              <div className="text-[11px] text-slate-400 italic">No email provided</div>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* CARD ACTIONS */}
+                        <div className="pt-3 border-t border-black/5 dark:border-white/5 flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-1.5">
+                            {c.email && !isVerified && (
+                              <button
+                                type="button"
+                                onClick={() => handleOpenOtpModal(c.email!)}
+                                className="px-2.5 py-1 text-[10px] font-geist-mono uppercase font-semibold text-[#5e5ce6] bg-[#5e5ce6]/10 hover:bg-[#5e5ce6]/20 rounded-lg transition-colors"
+                              >
+                                OTP Verify
+                              </button>
+                            )}
+                            {isVerified && (
+                              <span className="inline-flex items-center gap-1 text-[10px] font-geist-mono uppercase font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-lg">
+                                <ShieldCheck className="w-3 h-3" />
+                                Verified
+                              </span>
+                            )}
+                          </div>
+
+                          <div className="flex items-center gap-1">
+                            {c.email && (
+                              <button
+                                type="button"
+                                onClick={() => handleQuickCompose(c.email)}
+                                className="p-1.5 text-slate-400 hover:text-[#5e5ce6] rounded-lg hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
+                                title="Compose Email"
+                              >
+                                <Send className="w-3.5 h-3.5" />
+                              </button>
+                            )}
+                            <button
+                              type="button"
+                              onClick={() => handleEdit(c)}
+                              className="p-1.5 text-slate-400 hover:text-indigo-600 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
+                              title="Edit Contact"
+                            >
+                              <Edit2 className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleDelete(c.id)}
+                              className="p-1.5 text-slate-400 hover:text-rose-600 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
+                              title="Delete Contact"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+
+                  {/* QUICK ACTION INVITE / ADD CARD */}
+                  <div
+                    onClick={() => {
+                      handleCancelEdit();
+                      setActiveTab('contacts');
+                    }}
+                    className="ambient-card p-5 rounded-2xl border-dashed border-2 border-slate-300/80 dark:border-slate-700/80 flex items-center gap-4 cursor-pointer hover:border-[#5e5ce6] hover:bg-white/60 dark:hover:bg-slate-900/60 transition-all opacity-80 hover:opacity-100"
+                  >
+                    <div className="w-14 h-14 rounded-xl border border-dashed border-slate-400 dark:border-slate-600 text-slate-400 flex items-center justify-center font-geist-mono text-2xl font-light">
+                      +
+                    </div>
+                    <div className="space-y-0.5">
+                      <div className="meta-tag text-slate-400">QUICK ACTION</div>
+                      <div className="font-semibold text-sm text-[#1a1a1e] dark:text-white">
+                        Create New Entry
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="p-12 text-center rounded-2xl bg-white/30 dark:bg-slate-900/30 border border-black/5 dark:border-white/5 space-y-3">
+                  <Users className="w-8 h-8 text-slate-400 mx-auto" />
+                  <div className="font-geist-mono text-xs uppercase tracking-wider text-slate-600 dark:text-slate-400">
+                    {searchQuery ? 'NO MATCHING DIRECTORY RECORDS' : 'DIRECTORY EMPTY'}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab('contacts')}
+                    className="px-5 py-2.5 bg-[#1a1a1e] dark:bg-white text-white dark:text-[#1a1a1e] text-xs font-semibold uppercase tracking-wider font-geist-mono rounded-xl shadow-md"
+                  >
+                    Add First Contact
+                  </button>
+                </div>
+              )}
+
+
+            </div>
+          )}
+
+          {/* VIEW: ADD / EDIT CONTACT FORM */}
+          {activeTab === 'contacts' && (
+            <div className="max-w-2xl mx-auto w-full space-y-6">
+              <div className="flex items-center justify-between border-b border-black/5 dark:border-white/5 pb-4">
+                <div>
+                  <div className="meta-tag text-slate-400">DIRECTORY EDITOR</div>
+                  <h2 className="text-2xl font-light tracking-tight text-[#1a1a1e] dark:text-white">
+                    {editingId ? 'Edit Contact Profile' : 'New Contact Entry'}
+                  </h2>
+                </div>
                 <button
-                  type="submit"
-                  className="px-5 py-2.5 bg-indigo-600 text-white font-bold text-xs rounded-full shadow-md hover:bg-indigo-700 transition-all active:scale-95"
+                  type="button"
+                  onClick={() => setActiveTab('saved')}
+                  className="text-xs font-geist-mono uppercase tracking-wider text-[#5e5ce6] hover:underline"
                 >
-                  {editingId ? 'Save Changes' : 'Add Contact'}
+                  ← Return to Directory
                 </button>
               </div>
-            </form>
-          </div>
-        )}
 
-        {/* TAB 3: MARKDOWN MAILER */}
-        {activeTab === 'mailer' && (
-          <MarkdownEmailComposer contacts={contacts} />
-        )}
+              <form onSubmit={handleSubmit} className="space-y-4">
+                {formError && (
+                  <div className="p-3.5 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-600 dark:text-rose-400 text-xs font-mono">
+                    {formError}
+                  </div>
+                )}
 
-        {/* TAB 4: AI VOICE TALKBACK */}
-        {activeTab === 'talkback' && (
-          <AiVoiceTalkback contacts={contacts} />
-        )}
-      </div>
+                {/* Name */}
+                <div className="space-y-1.5">
+                  <label className="block meta-tag text-slate-500">FULL NAME *</label>
+                  <div className="relative">
+                    <User className="w-4 h-4 text-slate-400 absolute left-4 top-3.5" />
+                    <input
+                      type="text"
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      placeholder="Jane Doe"
+                      required
+                      className="w-full pl-11 pr-4 py-3 bg-white/50 dark:bg-slate-950/40 border border-black/10 dark:border-white/10 rounded-xl text-xs text-[#1a1a1e] dark:text-white font-mono focus:outline-none focus:border-[#5e5ce6]"
+                    />
+                  </div>
+                </div>
 
-      {/* FLOATING NEUMORPHIC BOTTOM NAVIGATION PILL BAR */}
-      <div className="fixed bottom-4 left-1/2 -translate-x-1/2 max-w-md w-[calc(100%-1.5rem)] bg-[#eef2f7]/90 dark:bg-[#1e293b]/90 backdrop-blur-xl p-2 rounded-full shadow-[8px_8px_18px_rgba(166,180,200,0.4),-8px_-8px_18px_rgba(255,255,255,0.9)] dark:shadow-[8px_8px_18px_rgba(10,15,26,0.6)] border border-white/80 dark:border-slate-800 z-40 flex items-center justify-around">
-        {/* Tab 1: Saved Contacts */}
-        <button
-          onClick={() => setActiveTab('saved')}
-          className={`flex-1 py-2 rounded-full flex flex-col items-center gap-0.5 text-[10px] font-bold transition-all ${
-            activeTab === 'saved'
-              ? 'bg-indigo-600 text-white shadow-md shadow-indigo-500/25'
-              : 'text-slate-500 hover:text-slate-800 dark:hover:text-white'
-          }`}
-        >
-          <Users className="w-4 h-4" />
-          <span>Contacts</span>
-        </button>
+                {/* Phone */}
+                <div className="space-y-1.5">
+                  <label className="block meta-tag text-slate-500">PHONE NUMBER *</label>
+                  <div className="relative">
+                    <Phone className="w-4 h-4 text-slate-400 absolute left-4 top-3.5" />
+                    <input
+                      type="tel"
+                      value={phone}
+                      onChange={(e) => setPhone(e.target.value)}
+                      placeholder="+91 9876543210"
+                      required
+                      className="w-full pl-11 pr-4 py-3 bg-white/50 dark:bg-slate-950/40 border border-black/10 dark:border-white/10 rounded-xl text-xs text-[#1a1a1e] dark:text-white font-mono focus:outline-none focus:border-[#5e5ce6]"
+                    />
+                  </div>
+                </div>
 
-        {/* Tab 2: Add Contact */}
-        <button
-          onClick={() => {
-            handleCancelEdit();
-            setActiveTab('contacts');
-          }}
-          className={`flex-1 py-2 rounded-full flex flex-col items-center gap-0.5 text-[10px] font-bold transition-all ${
-            activeTab === 'contacts'
-              ? 'bg-indigo-600 text-white shadow-md shadow-indigo-500/25'
-              : 'text-slate-500 hover:text-slate-800 dark:hover:text-white'
-          }`}
-        >
-          <Plus className="w-4 h-4" />
-          <span>Add New</span>
-        </button>
+                {/* Place */}
+                <div className="space-y-1.5">
+                  <label className="block meta-tag text-slate-500">LOCATION / CITY *</label>
+                  <div className="relative">
+                    <MapPin className="w-4 h-4 text-slate-400 absolute left-4 top-3.5" />
+                    <input
+                      type="text"
+                      value={place}
+                      onChange={(e) => setPlace(e.target.value)}
+                      placeholder="Bengaluru, Karnataka"
+                      required
+                      className="w-full pl-11 pr-4 py-3 bg-white/50 dark:bg-slate-950/40 border border-black/10 dark:border-white/10 rounded-xl text-xs text-[#1a1a1e] dark:text-white font-mono focus:outline-none focus:border-[#5e5ce6]"
+                    />
+                  </div>
+                </div>
 
-        {/* Tab 3: Mailer */}
-        <button
-          onClick={() => setActiveTab('mailer')}
-          className={`flex-1 py-2 rounded-full flex flex-col items-center gap-0.5 text-[10px] font-bold transition-all ${
-            activeTab === 'mailer'
-              ? 'bg-indigo-600 text-white shadow-md shadow-indigo-500/25'
-              : 'text-slate-500 hover:text-slate-800 dark:hover:text-white'
-          }`}
-        >
-          <Send className="w-4 h-4" />
-          <span>Mailer</span>
-        </button>
+                {/* Email */}
+                <div className="space-y-1.5">
+                  <label className="block meta-tag text-slate-500">EMAIL ADDRESS (OPTIONAL)</label>
+                  <div className="flex items-center gap-2">
+                    <div className="relative flex-1">
+                      <Mail className="w-4 h-4 text-slate-400 absolute left-4 top-3.5" />
+                      <input
+                        type="email"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        placeholder="jane@example.com"
+                        className="w-full pl-11 pr-4 py-3 bg-white/50 dark:bg-slate-950/40 border border-black/10 dark:border-white/10 rounded-xl text-xs text-[#1a1a1e] dark:text-white font-mono focus:outline-none focus:border-[#5e5ce6]"
+                      />
+                    </div>
+                    {email.trim().includes('@') && !verifiedEmails.includes(email.toLowerCase().trim()) && (
+                      <button
+                        type="button"
+                        onClick={() => handleOpenOtpModal(email)}
+                        className="px-4 py-3 bg-[#5e5ce6] text-white text-xs font-semibold uppercase tracking-wider font-geist-mono rounded-xl shrink-0 shadow-sm hover:bg-[#5e5ce6]/90"
+                      >
+                        Verify OTP
+                      </button>
+                    )}
+                  </div>
+                </div>
 
-        {/* Tab 4: AI Voice */}
-        <button
-          onClick={() => setActiveTab('talkback')}
-          className={`flex-1 py-2 rounded-full flex flex-col items-center gap-0.5 text-[10px] font-bold transition-all ${
-            activeTab === 'talkback'
-              ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-md shadow-indigo-500/25 ring-2 ring-indigo-400/40'
-              : 'text-indigo-600 dark:text-indigo-400 hover:text-indigo-700'
-          }`}
-        >
-          <Radio className="w-4 h-4 animate-spin text-cyan-300" />
-          <span>AI Voice</span>
-        </button>
+                {/* Submit / Cancel Buttons */}
+                <div className="flex items-center justify-end gap-3 pt-4">
+                  {editingId && (
+                    <button
+                      type="button"
+                      onClick={handleCancelEdit}
+                      className="px-5 py-3 rounded-xl border border-black/10 dark:border-white/10 text-xs font-semibold uppercase tracking-wider font-geist-mono hover:bg-black/5 dark:hover:bg-white/5"
+                    >
+                      Cancel
+                    </button>
+                  )}
+                  <button
+                    type="submit"
+                    className="px-6 py-3 rounded-xl bg-[#1a1a1e] dark:bg-white text-white dark:text-[#1a1a1e] text-xs font-semibold uppercase tracking-wider font-geist-mono shadow-md hover:bg-black/90 dark:hover:bg-slate-100 transition-all"
+                  >
+                    {editingId ? 'Save Updates' : 'Add Contact'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          )}
+
+          {/* VIEW: MARKDOWN EMAIL COMPOSER */}
+          {activeTab === 'mailer' && (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between border-b border-black/5 dark:border-white/5 pb-3">
+                <div className="meta-tag text-slate-400">SMTP DISPATCH ENGINE</div>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('saved')}
+                  className="text-xs font-geist-mono uppercase tracking-wider text-[#5e5ce6] hover:underline"
+                >
+                  ← Return to Directory
+                </button>
+              </div>
+              <MarkdownEmailComposer
+                contacts={contacts}
+                initialRecipient={prefilledEmail}
+                initialSubject={prefilledSubject || undefined}
+                initialMarkdown={prefilledMarkdown || undefined}
+              />
+            </div>
+          )}
+
+          {/* VIEW: AI VOICE TALKBACK */}
+          {activeTab === 'talkback' && (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between border-b border-black/5 dark:border-white/5 pb-3">
+                <div className="meta-tag text-[#5e5ce6] flex items-center gap-1.5">
+                  <Radio className="w-3.5 h-3.5 animate-pulse text-[#5e5ce6]" />
+                  AI VOICE ASSISTANT
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('saved')}
+                  className="text-xs font-geist-mono uppercase tracking-wider text-[#5e5ce6] hover:underline"
+                >
+                  ← Return to Directory
+                </button>
+              </div>
+              <AiVoiceTalkback
+                contacts={contacts}
+                onDraftToMailer={(draftSubject, draftBody, draftRecipient) => {
+                  setPrefilledSubject(draftSubject);
+                  setPrefilledMarkdown(draftBody);
+                  if (draftRecipient) {
+                    setPrefilledEmail(draftRecipient);
+                  }
+                  setActiveTab('mailer');
+                }}
+              />
+            </div>
+          )}
+        </main>
       </div>
 
       {/* OTP VERIFICATION MODAL */}
@@ -671,4 +753,5 @@ export default function App() {
     </div>
   );
 }
+
 

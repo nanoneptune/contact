@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import {
@@ -33,6 +33,9 @@ import GlassmorphismOtpModal from './GlassmorphismOtpModal';
 
 interface MarkdownEmailComposerProps {
   contacts: Contact[];
+  initialRecipient?: string;
+  initialSubject?: string;
+  initialMarkdown?: string;
 }
 
 const COLOR_OPTIONS = [
@@ -63,10 +66,31 @@ console.log(greeting);
 > *Feel free to edit this raw text or select a contact above to send a real email!*
 `;
 
-export default function MarkdownEmailComposer({ contacts }: MarkdownEmailComposerProps) {
-  const [recipient, setRecipient] = useState('');
-  const [subject, setSubject] = useState('Greetings from Contacts App!');
-  const [markdown, setMarkdown] = useState(INITIAL_MARKDOWN);
+export default function MarkdownEmailComposer({
+  contacts,
+  initialRecipient = '',
+  initialSubject = 'Greetings from Contacts App!',
+  initialMarkdown = INITIAL_MARKDOWN,
+}: MarkdownEmailComposerProps) {
+  const [recipient, setRecipient] = useState(initialRecipient);
+  const [subject, setSubject] = useState(initialSubject);
+  const [markdown, setMarkdown] = useState(initialMarkdown);
+
+  useEffect(() => {
+    if (initialRecipient) setRecipient(initialRecipient);
+  }, [initialRecipient]);
+
+  useEffect(() => {
+    if (initialSubject && initialSubject !== 'Greetings from Contacts App!') {
+      setSubject(initialSubject);
+    }
+  }, [initialSubject]);
+
+  useEffect(() => {
+    if (initialMarkdown && initialMarkdown !== INITIAL_MARKDOWN) {
+      setMarkdown(initialMarkdown);
+    }
+  }, [initialMarkdown]);
   const [viewMode, setViewMode] = useState<'split' | 'raw' | 'preview'>('split');
   const [selectedColor, setSelectedColor] = useState('#ef4444');
   const [showColorPicker, setShowColorPicker] = useState(false);
@@ -182,28 +206,28 @@ export default function MarkdownEmailComposer({ contacts }: MarkdownEmailCompose
   return (
     <div className="space-y-6">
       {/* Sender Info Banner */}
-      <div className="bg-gradient-to-r from-indigo-900 via-slate-900 to-slate-950 text-white rounded-2xl p-4 shadow-md border border-indigo-800/40 flex flex-wrap items-center justify-between gap-2">
-        <div className="flex items-center gap-2">
-          <Mail className="w-4 h-4 text-indigo-400" />
-          <span className="text-xs text-slate-300">
-            Compose rich formatted messages and send directly via Gmail SMTP.
+      <div className="ambient-card rounded-2xl p-4 flex flex-wrap items-center justify-between gap-3 shadow-xs">
+        <div className="flex items-center gap-2.5">
+          <Mail className="w-4 h-4 text-[#5e5ce6]" />
+          <span className="text-xs text-slate-600 dark:text-slate-300">
+            Compose rich markdown formatted messages and dispatch directly via SMTP.
           </span>
         </div>
-        <span className="text-[11px] font-mono bg-indigo-950/80 text-indigo-300 px-2.5 py-0.5 rounded-full border border-indigo-700/50">
-          Sender: nanoneptunemusic@gmail.com
+        <span className="meta-tag bg-black/5 dark:bg-white/10 text-slate-700 dark:text-slate-300 px-3 py-1 rounded-lg border border-black/5 dark:border-white/10">
+          SENDER: nanoneptunemusic@gmail.com
         </span>
       </div>
 
       {/* Recipient & Subject Form */}
-      <form onSubmit={handleSendEmail} className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-6 shadow-xs space-y-4">
+      <form onSubmit={handleSendEmail} className="ambient-card rounded-2xl p-6 shadow-xs space-y-4">
         
         {/* Status Notification */}
         {sendStatus && (
           <div
-            className={`p-3.5 rounded-xl border text-xs flex items-start gap-2.5 ${
+            className={`p-3.5 rounded-xl border text-xs flex items-start gap-2.5 font-mono ${
               sendStatus.type === 'success'
-                ? 'bg-emerald-50 text-emerald-900 border-emerald-200 dark:bg-emerald-950/60 dark:text-emerald-200 dark:border-emerald-800'
-                : 'bg-rose-50 text-rose-900 border-rose-200 dark:bg-rose-950/60 dark:text-rose-200 dark:border-rose-800'
+                ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/20'
+                : 'bg-rose-500/10 text-rose-700 dark:text-rose-300 border-rose-500/20'
             }`}
           >
             {sendStatus.type === 'success' ? (
@@ -217,18 +241,18 @@ export default function MarkdownEmailComposer({ contacts }: MarkdownEmailCompose
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           {/* Quick Select from Saved Contacts */}
-          <div>
-            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1 flex items-center justify-between">
-              <span>Quick Fill From Contacts</span>
+          <div className="space-y-1.5">
+            <label className="block meta-tag text-slate-500 flex items-center justify-between">
+              <span>QUICK SELECT CONTACT</span>
               <User className="w-3.5 h-3.5 text-slate-400" />
             </label>
             <select
               onChange={handleSelectContact}
               defaultValue=""
-              className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-slate-100 focus:outline-none focus:border-indigo-500"
+              className="w-full px-3 py-2.5 bg-white/50 dark:bg-slate-950/40 border border-black/10 dark:border-white/10 rounded-xl text-xs text-[#1a1a1e] dark:text-slate-100 font-mono focus:outline-none focus:border-[#5e5ce6]"
             >
               <option value="" disabled>
-                -- Select a contact with email --
+                -- Select contact from directory --
               </option>
               {contacts.map((c) => (
                 <option key={c.id} value={c.email || ''} disabled={!c.email}>
@@ -239,14 +263,14 @@ export default function MarkdownEmailComposer({ contacts }: MarkdownEmailCompose
           </div>
 
           {/* Recipient Email Address Input */}
-          <div>
-            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1 flex items-center justify-between">
+          <div className="space-y-1.5">
+            <label className="block meta-tag text-slate-500 flex items-center justify-between">
               <span className="flex items-center gap-1.5">
-                <span>Recipient Email</span>
+                <span>RECIPIENT EMAIL</span>
                 {recipient && verifiedEmails.includes(recipient.toLowerCase().trim()) && (
-                  <span className="inline-flex items-center gap-1 text-[10px] bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 px-2 py-0.5 rounded-full font-semibold border border-emerald-300 dark:border-emerald-800">
+                  <span className="inline-flex items-center gap-1 text-[9px] bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 px-2 py-0.5 rounded-full font-semibold border border-emerald-500/20 font-mono">
                     <CheckCircle2 className="w-3 h-3 text-emerald-500" />
-                    Verified OTP ✓
+                    VERIFIED
                   </span>
                 )}
               </span>
@@ -259,17 +283,17 @@ export default function MarkdownEmailComposer({ contacts }: MarkdownEmailCompose
                 onChange={(e) => setRecipient(e.target.value)}
                 placeholder="recipient@example.com"
                 required
-                className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:border-indigo-500"
+                className="w-full px-3.5 py-2.5 bg-white/50 dark:bg-slate-950/40 border border-black/10 dark:border-white/10 rounded-xl text-xs text-[#1a1a1e] dark:text-slate-100 font-mono placeholder:text-slate-400 focus:outline-none focus:border-[#5e5ce6]"
               />
               {recipient.trim().includes('@') && !verifiedEmails.includes(recipient.toLowerCase().trim()) && (
                 <button
                   type="button"
                   onClick={() => setOtpModalOpen(true)}
-                  className="shrink-0 inline-flex items-center gap-1.5 px-3 py-2 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white text-xs font-semibold rounded-xl shadow-xs transition-all active:scale-95"
-                  title="Send Glassmorphism OTP Email to Verify Recipient"
+                  className="shrink-0 inline-flex items-center gap-1.5 px-3 py-2.5 bg-[#5e5ce6] hover:bg-[#5e5ce6]/90 text-white text-xs font-semibold uppercase tracking-wider font-geist-mono rounded-xl shadow-xs transition-all active:scale-95"
+                  title="Send OTP Email to Verify Recipient"
                 >
                   <ShieldCheck className="w-3.5 h-3.5" />
-                  <span>Verify (OTP)</span>
+                  <span>Verify</span>
                 </button>
               )}
             </div>
@@ -277,9 +301,9 @@ export default function MarkdownEmailComposer({ contacts }: MarkdownEmailCompose
         </div>
 
         {/* Subject Line */}
-        <div>
-          <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-            Subject Line <span className="text-rose-500">*</span>
+        <div className="space-y-1.5">
+          <label className="block meta-tag text-slate-500">
+            SUBJECT LINE <span className="text-rose-500">*</span>
           </label>
           <input
             type="text"
@@ -287,12 +311,12 @@ export default function MarkdownEmailComposer({ contacts }: MarkdownEmailCompose
             onChange={(e) => setSubject(e.target.value)}
             placeholder="Important update..."
             required
-            className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:border-indigo-500"
+            className="w-full px-3.5 py-2.5 bg-white/50 dark:bg-slate-950/40 border border-black/10 dark:border-white/10 rounded-xl text-xs text-[#1a1a1e] dark:text-slate-100 font-mono placeholder:text-slate-400 focus:outline-none focus:border-[#5e5ce6]"
           />
         </div>
 
         {/* Markdown Toolbar & View Modes */}
-        <div className="border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden bg-slate-50 dark:bg-slate-900">
+        <div className="border border-black/10 dark:border-white/10 rounded-2xl overflow-hidden bg-white/40 dark:bg-slate-950/40">
           
           {/* Toolbar */}
           <div className="p-2 bg-slate-100 dark:bg-slate-800/80 border-b border-slate-200 dark:border-slate-700 flex flex-wrap items-center justify-between gap-2">
@@ -530,17 +554,17 @@ export default function MarkdownEmailComposer({ contacts }: MarkdownEmailCompose
           <button
             type="submit"
             disabled={sending}
-            className="inline-flex items-center gap-2 px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs rounded-xl shadow-md transition-all active:scale-95 disabled:opacity-50"
+            className="inline-flex items-center gap-2 px-6 py-3 bg-[#1a1a1e] dark:bg-white hover:bg-black/90 dark:hover:bg-slate-100 text-white dark:text-[#1a1a1e] font-semibold text-xs uppercase tracking-wider font-geist-mono rounded-xl shadow-md transition-all active:scale-95 disabled:opacity-50"
           >
             {sending ? (
               <>
                 <RefreshCw className="w-4 h-4 animate-spin" />
-                <span>Sending Email...</span>
+                <span>Dispatching SMTP...</span>
               </>
             ) : (
               <>
                 <Send className="w-4 h-4" />
-                <span>Send Email via SMTP</span>
+                <span>Send Email Message</span>
               </>
             )}
           </button>
