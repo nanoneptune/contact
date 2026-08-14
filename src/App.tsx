@@ -25,9 +25,10 @@ import { supabase } from './lib/supabase';
 import MarkdownEmailComposer from './components/MarkdownEmailComposer';
 import GlassmorphismOtpModal from './components/GlassmorphismOtpModal';
 import AiVoiceTalkback from './components/AiVoiceTalkback';
+import TelegramBotSync from './components/TelegramBotSync';
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<'saved' | 'contacts' | 'mailer' | 'talkback'>('saved');
+  const [activeTab, setActiveTab] = useState<'saved' | 'contacts' | 'mailer' | 'talkback' | 'telegram'>('saved');
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
 
@@ -353,6 +354,22 @@ export default function App() {
                   LIVE
                 </span>
               </button>
+
+              <button
+                type="button"
+                onClick={() => setActiveTab('telegram')}
+                className={`flex items-center gap-2 px-3.5 sm:px-4 py-2.5 rounded-xl font-medium text-xs transition-all ${
+                  activeTab === 'telegram'
+                    ? 'bg-[#0088cc] text-white shadow-md font-semibold'
+                    : 'text-[#0088cc] dark:text-cyan-400 hover:bg-[#0088cc]/10'
+                }`}
+              >
+                <Send className="w-3.5 h-3.5 sm:w-4 sm:h-4 -rotate-45" />
+                <span>Telegram Bot</span>
+                <span className="font-geist-mono text-[10px] bg-white/20 px-1.5 py-0.5 rounded-md">
+                  SYNC
+                </span>
+              </button>
             </nav>
           </div>
         </header>
@@ -421,8 +438,17 @@ export default function App() {
                         : 'bg-white/40 dark:bg-slate-900/40 text-slate-600 dark:text-slate-400 border border-black/5 dark:border-white/5 hover:bg-white/70'
                     }`}
                   >
-                    <Mail className="w-3 h-3 text-[#5e5ce6]" />
+                    <Mail className="w-3.5 h-3.5 text-[#5e5ce6]" />
                     HAS EMAIL ({emailableCount})
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab('telegram')}
+                    className="ml-auto px-3.5 py-1.5 rounded-lg transition-all tracking-wider text-[11px] uppercase flex items-center gap-1.5 bg-[#0088cc]/10 hover:bg-[#0088cc]/20 text-[#0088cc] dark:text-cyan-400 border border-[#0088cc]/30 font-semibold"
+                  >
+                    <Send className="w-3 h-3 -rotate-45" />
+                    <span>Sync from Telegram</span>
                   </button>
                 </div>
               </div>
@@ -736,6 +762,31 @@ export default function App() {
                     setPrefilledEmail(draftRecipient);
                   }
                   setActiveTab('mailer');
+                }}
+              />
+            </div>
+          )}
+
+          {/* VIEW: TELEGRAM BOT CONTACT SYNC */}
+          {activeTab === 'telegram' && (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between border-b border-black/5 dark:border-white/5 pb-3">
+                <div className="meta-tag text-[#0088cc] flex items-center gap-1.5 font-geist-mono">
+                  <Send className="w-3.5 h-3.5 -rotate-45 text-[#0088cc]" />
+                  TELEGRAM CONTACT INGESTION ENGINE
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('saved')}
+                  className="text-xs font-geist-mono uppercase tracking-wider text-[#0088cc] hover:underline"
+                >
+                  ← Return to Directory
+                </button>
+              </div>
+              <TelegramBotSync
+                existingContacts={contacts}
+                onContactsImported={(newlyImported) => {
+                  setContacts((prev) => [...newlyImported, ...prev]);
                 }}
               />
             </div>

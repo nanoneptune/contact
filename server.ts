@@ -16,6 +16,12 @@ import {
   deleteContactSupabase,
 } from "./src/db/supabaseStore";
 
+// Setup Telegram Bot Token
+const TELEGRAM_BOT_TOKEN =
+  process.env.TELEGRAM_BOT_TOKEN ||
+  process.env.VITE_TELEGRAM_BOT_TOKEN ||
+  "8927749666:AAECASzT9foWNDb8M6zzdKUgFsrprOBmueY";
+
 // Setup Nodemailer Transporter for Gmail SMTP
 const EMAIL_USER = process.env.EMAIL_USER || "nanoneptunemusic@gmail.com";
 const EMAIL_PASS = process.env.EMAIL_PASS || "vjlvkgudsrkdqksg";
@@ -518,6 +524,124 @@ INSTRUCTIONS:
     } catch (err: any) {
       console.error("[Sarvam TTS Exception]:", err);
       return res.status(500).json({ error: err?.message || "Failed to generate talkback audio." });
+    }
+  });
+
+  // TELEGRAM BOT API ROUTES
+  // 1. Get Bot Info (getMe)
+  app.get("/api/telegram/info", async (_req, res) => {
+    try {
+      const response = await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/getMe`);
+      const data = await response.json();
+      if (!data.ok) {
+        return res.status(500).json({ error: "Failed to connect to Telegram Bot", details: data });
+      }
+      return res.json({
+        success: true,
+        bot: data.result,
+        botUrl: `https://t.me/${data.result.username}`,
+      });
+    } catch (err: any) {
+      console.error("Telegram getMe error:", err);
+      return res.status(500).json({ error: err?.message || "Failed to connect to Telegram" });
+    }
+  });
+
+  // 2. Fetch updates and contacts from Telegram
+  app.get("/api/telegram/updates", async (req, res) => {
+    try {
+      const offset = req.query.offset ? Number(req.query.offset) : 0;
+      const response = await fetch(
+        `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/getUpdates?offset=${offset}&limit=100`
+      );
+      const data = await response.json();
+
+      if (!data.ok) {
+        return res.status(500).json({ error: "Telegram API error", details: data });
+      }
+
+      return res.json({
+        success: true,
+        updates: data.result || [],
+      });
+    } catch (err: any) {
+      console.error("Telegram getUpdates error:", err);
+      return res.status(500).json({ error: err?.message || "Failed to fetch Telegram updates" });
+    }
+  });
+
+  // 3. Send message back to Telegram chat
+  app.post("/api/telegram/send-message", async (req, res) => {
+    try {
+      const { chatId, text } = req.body;
+      if (!chatId || !text) {
+        return res.status(400).json({ error: "chatId and text are required" });
+      }
+
+      const response = await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          chat_id: chatId,
+          text,
+          parse_mode: "Markdown",
+        }),
+      });
+
+      const data = await response.json();
+      return res.json({ success: data.ok, result: data.result, error: data.description });
+    } catch (err: any) {
+      console.error("Telegram sendMessage error:", err);
+      return res.status(500).json({ error: err?.message || "Failed to send message via Telegram" });
+    }
+  });
+
+  // 4. Batch import Telegram contacts to Supabase & SQLite
+  app.post("/api/telegram/import-contacts", async (req, res) => {
+    try {
+      const { contacts } = req.body;
+      if (!Array.isArray(contacts) || contacts.length === 0) {
+        return res.status(400).json({ error: "Contacts array required" });
+      }
+
+      const importedList = [];
+      for (const item of contacts) {
+        const id = item.id || `contact-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
+        const newContact = {
+          id,
+          name: String(item.name || "Unknown").trim(),
+          phone: String(item.phone || "N/A").trim(),
+          place: String(item.place || "Telegram").trim(),
+          email: item.email ? String(item.email).trim() : undefined,
+          isFavorite: false,
+          createdAt: item.createdAt || Date.now(),
+        };
+
+        // Save to SQLite
+        try {
+          await addContactDB(newContact);
+        } catch (dbErr) {
+          console.warn("SQLite save notice:", dbErr);
+        }
+
+        // Save to Supabase
+        try {
+          await addContactSupabase(newContact);
+        } catch (sbErr) {
+          console.warn("Supabase save notice:", sbErr);
+        }
+
+        importedList.push(newContact);
+      }
+
+      return res.json({
+        success: true,
+        importedCount: importedList.length,
+        contacts: importedList,
+      });
+    } catch (err: any) {
+      console.error("Telegram import contacts error:", err);
+      return res.status(500).json({ error: err?.message || "Failed to import contacts" });
     }
   });
 
