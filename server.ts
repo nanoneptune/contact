@@ -284,7 +284,7 @@ async function startServer() {
     }
   });
 
-  // API Route: AI Voice Conversation (Gemini Primary + Groq Fallback)
+  // API Route: AI Voice Conversation (Groq Primary with Gemini & Local Fallback)
   app.post("/api/ai-chat", async (req, res) => {
     try {
       const { userMessage, contacts, history, languageCode } = req.body || {};
@@ -321,8 +321,69 @@ INSTRUCTIONS:
 3. Keep answers conversational, crisp, and under 120 words so they sound great over speech synthesis / talkback.
 4. Avoid markdown heavy tables or code blocks unless requested.`;
 
-      // 1. Try Google Gemini API first
-      const geminiApiKey = process.env.GEMINI_API_KEY;
+      // 1. Try Groq API as Primary Engine
+      const rawGroqKey = process.env.GROQ_API_KEY;
+      const groqKey = (rawGroqKey ? rawGroqKey.replace(/^["']|["']$/g, '').trim() : '') || "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";
+      
+      if (groqKey) {
+        try {
+          const messages = [
+            { role: "system", content: systemPrompt },
+            ...(Array.isArray(history) ? history.slice(-6) : []),
+            { role: "user", content: userMessage }
+          ];
+
+          // Try llama-3.3-70b-versatile first
+          let groqRes = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+            method: "POST",
+            headers: {
+              "Authorization": `Bearer ${groqKey}`,
+              "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+              model: "llama-3.3-70b-versatile",
+              messages,
+              temperature: 0.7,
+              max_tokens: 400
+            })
+          });
+
+          // Fallback to llama-3.1-8b-instant if 70b is rate-limited or fails
+          if (!groqRes.ok) {
+            console.warn(`[Groq Primary Failed ${groqRes.status}]: Trying llama-3.1-8b-instant...`);
+            groqRes = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+              method: "POST",
+              headers: {
+                "Authorization": `Bearer ${groqKey}`,
+                "Content-Type": "application/json"
+              },
+              body: JSON.stringify({
+                model: "llama-3.1-8b-instant",
+                messages,
+                temperature: 0.7,
+                max_tokens: 400
+              })
+            });
+          }
+
+          if (groqRes.ok) {
+            const data = await groqRes.json();
+            const groqReply = data.choices?.[0]?.message?.content;
+            if (groqReply && groqReply.trim()) {
+              console.log("[AI Chat] Successfully responded via Groq API");
+              return res.json({ reply: groqReply.trim(), source: "groq" });
+            }
+          } else {
+            const errText = await groqRes.text();
+            console.error("[Groq API Error Response]:", groqRes.status, errText);
+          }
+        } catch (groqError) {
+          console.error("[Groq API Exception]:", groqError);
+        }
+      }
+
+      // 2. Fallback to Google Gemini API
+      const geminiApiKey = process.env.GEMINI_API_KEY?.replace(/^["']|["']$/g, '').trim();
       if (geminiApiKey) {
         try {
           const ai = new GoogleGenAI({ apiKey: geminiApiKey });
@@ -340,46 +401,11 @@ INSTRUCTIONS:
 
           const geminiReply = geminiRes.text;
           if (geminiReply && geminiReply.trim()) {
-            return res.json({ reply: geminiReply.trim() });
+            console.log("[AI Chat] Responded via Gemini API fallback");
+            return res.json({ reply: geminiReply.trim(), source: "gemini" });
           }
         } catch (geminiError) {
           console.error("[Gemini API Attempt Failed]:", geminiError);
-        }
-      }
-
-      // 2. Try Groq API as Secondary
-      const groqKey = process.env.GROQ_API_KEY || "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";
-      if (groqKey) {
-        try {
-          const messages = [
-            { role: "system", content: systemPrompt },
-            ...(Array.isArray(history) ? history.slice(-6) : []),
-            { role: "user", content: userMessage }
-          ];
-
-          const groqRes = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-            method: "POST",
-            headers: {
-              "Authorization": `Bearer ${groqKey}`,
-              "Content-Type": "application/json"
-            },
-            body: JSON.stringify({
-              model: "llama-3.3-70b-versatile",
-              messages,
-              temperature: 0.7,
-              max_tokens: 400
-            })
-          });
-
-          if (groqRes.ok) {
-            const data = await groqRes.json();
-            const groqReply = data.choices?.[0]?.message?.content;
-            if (groqReply) {
-              return res.json({ reply: groqReply.trim() });
-            }
-          }
-        } catch (groqError) {
-          console.error("[Groq API Attempt Failed]:", groqError);
         }
       }
 
@@ -393,10 +419,10 @@ INSTRUCTIONS:
         fallbackReply = `नमस्ते! मैं आपका एआई वॉयस असिस्टेंट हूं। आपके पास ${contactCount} सेव किए गए संपर्क हैं। मैं आपकी क्या मदद कर सकता हूं?`;
       }
 
-      return res.json({ reply: fallbackReply });
+      return res.json({ reply: fallbackReply, source: "offline-template" });
     } catch (err: any) {
       console.error("[AI Chat Route Error]:", err);
-      return res.json({ reply: "Hello! I am your AI Assistant. How can I help you manage your contacts today?" });
+      return res.json({ reply: "Hello! I am your AI Assistant. How can I help you manage your contacts today?", source: "offline-error" });
     }
   });
 
@@ -404,37 +430,76 @@ INSTRUCTIONS:
   app.post("/api/sarvam-tts", async (req, res) => {
     try {
       const { text, languageCode } = req.body;
-      const sarvamKey = process.env.SARVAM_API_KEY || "sk_sugpmk4r_XFuBU2y16WzaWQPCSxp7tHKb";
+      const rawSarvamKey = process.env.SARVAM_API_KEY;
+      const sarvamKey = (rawSarvamKey ? rawSarvamKey.replace(/^["']|["']$/g, '').trim() : '') || "sk_sugpmk4r_XFuBU2y16WzaWQPCSxp7tHKb";
 
       if (!text || typeof text !== "string") {
         return res.status(400).json({ error: "Text string is required for speech synthesis." });
       }
 
-      // Truncate text if excessively long for TTS
+      // Truncate text if excessively long for TTS and clean special characters
       const cleanText = text.replace(/[*#_`]/g, '').trim().slice(0, 500);
 
-      const sarvamRes = await fetch("https://api.sarvam.ai/text-to-speech", {
+      const targetLang = languageCode || "en-IN";
+
+      // Try Bulbul V3 first
+      let sarvamRes = await fetch("https://api.sarvam.ai/text-to-speech", {
         method: "POST",
         headers: {
           "api-subscription-key": sarvamKey,
+          "Authorization": `Bearer ${sarvamKey}`,
           "Content-Type": "application/json"
         },
         body: JSON.stringify({
           inputs: [cleanText],
-          target_language_code: languageCode || "en-IN",
-          speaker: "meera",
-          pitch: 0,
-          pace: 1.05,
-          loudness: 1.5,
-          speech_sample_rate: 22050,
-          enable_preprocessing: true,
-          model: "bulbul:v1"
+          target_language_code: targetLang,
+          speaker: "ritu",
+          pace: 1.0,
+          model: "bulbul:v3"
         })
       });
 
+      // If Bulbul v3 is not supported or errors, try Bulbul v2
+      if (!sarvamRes.ok) {
+        console.warn(`[Sarvam V3 TTS returned ${sarvamRes.status}]: Trying Bulbul v2...`);
+        sarvamRes = await fetch("https://api.sarvam.ai/text-to-speech", {
+          method: "POST",
+          headers: {
+            "api-subscription-key": sarvamKey,
+            "Authorization": `Bearer ${sarvamKey}`,
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            inputs: [cleanText],
+            target_language_code: targetLang,
+            speaker: "anushka",
+            pace: 1.0,
+            model: "bulbul:v2"
+          })
+        });
+      }
+
+      // If still not ok, try without model attribute
+      if (!sarvamRes.ok) {
+        console.warn(`[Sarvam V2 TTS returned ${sarvamRes.status}]: Trying default payload...`);
+        sarvamRes = await fetch("https://api.sarvam.ai/text-to-speech", {
+          method: "POST",
+          headers: {
+            "api-subscription-key": sarvamKey,
+            "Authorization": `Bearer ${sarvamKey}`,
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            inputs: [cleanText],
+            target_language_code: targetLang,
+            speaker: "shubh"
+          })
+        });
+      }
+
       if (!sarvamRes.ok) {
         const errText = await sarvamRes.text();
-        console.error("[Sarvam TTS Error]:", sarvamRes.status, errText);
+        console.error("[Sarvam TTS All Attempts Failed]:", sarvamRes.status, errText);
         return res.status(sarvamRes.status).json({ error: "Sarvam TTS request failed", details: errText });
       }
 
@@ -447,6 +512,7 @@ INSTRUCTIONS:
 
       return res.json({
         success: true,
+        provider: "sarvam",
         audioBase64: `data:audio/wav;base64,${audioBase64}`
       });
     } catch (err: any) {

@@ -34,6 +34,7 @@ interface ChatMessage {
   sender: 'user' | 'ai';
   text: string;
   timestamp: string;
+  source?: string;
 }
 
 type SupportedLanguage = 'kn-IN' | 'hi-IN' | 'en-IN';
@@ -228,15 +229,18 @@ export default function AiVoiceTalkback({ contacts }: AiVoiceTalkbackProps) {
       });
 
       let replyText = '';
+      let replySource = 'groq';
       const contentType = res.headers.get('content-type');
 
       if (contentType && contentType.includes('application/json')) {
         const data = await res.json();
         replyText = data.reply || data.error || "I've processed your request.";
+        replySource = data.source || 'groq';
       } else {
         const textBody = await res.text();
         console.warn('Non-JSON response received:', textBody.slice(0, 100));
         replyText = `Hello! I am your AI Assistant. You have ${contacts?.length || 0} saved contact${contacts?.length === 1 ? '' : 's'}. How can I assist you today?`;
+        replySource = 'offline';
       }
 
       const aiMsg: ChatMessage = {
@@ -244,6 +248,7 @@ export default function AiVoiceTalkback({ contacts }: AiVoiceTalkbackProps) {
         sender: 'ai',
         text: replyText,
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        source: replySource,
       };
 
       setMessages((prev) => [...prev, aiMsg]);
@@ -396,11 +401,24 @@ export default function AiVoiceTalkback({ contacts }: AiVoiceTalkbackProps) {
         </div>
       </div>
 
-      {/* Minimalist Hero Voice Trigger Card */}
+        {/* Minimalist Hero Voice Trigger Card */}
       <div className="relative overflow-hidden bg-gradient-to-br from-indigo-900 via-slate-900 to-slate-950 text-white rounded-3xl p-5 shadow-lg border border-indigo-500/20 flex flex-col items-center justify-center text-center space-y-3">
         {/* Soft Glowing Background Orbs */}
         <div className="absolute -top-10 -right-10 w-40 h-40 bg-indigo-500/20 rounded-full blur-2xl pointer-events-none" />
         <div className="absolute -bottom-10 -left-10 w-40 h-40 bg-purple-500/20 rounded-full blur-2xl pointer-events-none" />
+
+        {/* Engine Integration Badge */}
+        <div className="flex items-center gap-2 text-[10px] font-medium bg-indigo-950/80 border border-indigo-500/30 text-indigo-200 px-3 py-1 rounded-full shadow-2xs">
+          <span className="flex items-center gap-1 font-semibold text-amber-300">
+            <Zap className="w-3 h-3 text-amber-400" />
+            Groq LLaMA 3.3
+          </span>
+          <span className="text-slate-500">•</span>
+          <span className="flex items-center gap-1 font-semibold text-emerald-300">
+            <Volume2 className="w-3 h-3 text-emerald-400" />
+            Sarvam AI TTS
+          </span>
+        </div>
 
         {/* Big Interactive Mic Button */}
         <div className="relative">
@@ -562,13 +580,26 @@ export default function AiVoiceTalkback({ contacts }: AiVoiceTalkbackProps) {
                     </button>
                   </div>
 
-                  <span
-                    className={`font-mono ${
-                      msg.sender === 'user' ? 'text-indigo-200' : 'text-slate-400 dark:text-slate-500'
-                    }`}
-                  >
-                    {msg.timestamp}
-                  </span>
+                  <div className="flex items-center gap-1.5 font-mono">
+                    {msg.sender === 'ai' && msg.source && (
+                      <span className={`text-[9px] px-1 py-0.2 rounded font-sans font-medium ${
+                        msg.source === 'groq'
+                          ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20'
+                          : msg.source === 'gemini'
+                          ? 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20'
+                          : 'bg-slate-200 dark:bg-slate-700 text-slate-500'
+                      }`}>
+                        {msg.source === 'groq' ? '⚡ Groq' : msg.source === 'gemini' ? '✦ Gemini' : 'Local'}
+                      </span>
+                    )}
+                    <span
+                      className={`${
+                        msg.sender === 'user' ? 'text-indigo-200' : 'text-slate-400 dark:text-slate-500'
+                      }`}
+                    >
+                      {msg.timestamp}
+                    </span>
+                  </div>
                 </div>
               </div>
             </div>
