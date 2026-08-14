@@ -1,0 +1,95 @@
+{
+  "id": "/?source=pwa",
+  "name": "Contact Manager & Messaging Hub",
+  "short_name": "Contacts",
+  "description": "Minimalist Ambient Contacts Directory with Markdown Mailer, Telegram Bot Sync, and AI Voice Talkback.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "display_override": ["window-controls-overlay", "standalone", "minimal-ui", "browser"],
+  "orientation": "any",
+  "background_color": "#fbfbfd",
+  "theme_color": "#5e5ce6",
+  "lang": "en",
+  "dir": "auto",
+  "categories": ["productivity", "utilities", "business", "communication"],
+  "prefer_related_applications": false,
+  "icons": [
+    {
+      "src": "/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-maskable-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/icons/icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Directory",
+      "short_name": "Directory",
+      "description": "View and manage contacts",
+      "url": "/?tab=saved",
+      "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Markdown Mailer",
+      "short_name": "Mailer",
+      "description": "Broadcast markdown email notices",
+      "url": "/?tab=mailer",
+      "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Telegram Bot",
+      "short_name": "Telegram",
+      "description": "Send bot notices & sync telegram contacts",
+      "url": "/?tab=telegram",
+      "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "AI Voice Talkback",
+      "short_name": "AI Voice",
+      "description": "Live AI conversational directory talkback",
+      "url": "/?tab=talkback",
+      "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }]
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "/icons/screenshot-desktop.png",
+      "sizes": "1280x720",
+      "type": "image/png",
+      "form_factor": "wide",
+      "label": "Contact Directory & Mailer Desktop View"
+    },
+    {
+      "src": "/icons/screenshot-mobile.png",
+      "sizes": "750x1334",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "Contact Directory Mobile View"
+    }
+  ]
+}

@@ -1,0 +1,49 @@
+{
+  "id": "/?source=pwa",
+  "name": "Contact Manager & Messaging Hub",
+  "short_name": "Contacts",
+  "description": "Minimalist Ambient Contacts Directory with Markdown Mailer, Telegram Bot Sync, and AI Voice Talkback.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "display_override": ["window-controls-overlay", "standalone", "minimal-ui", "browser"],
+  "orientation": "any",
+  "background_color": "#fbfbfd",
+  "theme_color": "#5e5ce6",
+  "lang": "en",
+  "dir": "auto",
+  "categories": ["productivity", "utilities", "business", "communication"],
+  "prefer_related_applications": false,
+  "icons": [
+    {
+      "src": "/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-maskable-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/icons/icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}
