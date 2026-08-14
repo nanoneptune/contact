@@ -23,6 +23,8 @@ import {
   MessageSquare,
   ArrowRight,
   ChevronRight,
+  AlertCircle,
+  X,
 } from 'lucide-react';
 import { Contact } from '../types';
 
@@ -188,6 +190,7 @@ export default function AiVoiceTalkback({ contacts, onDraftToMailer }: AiVoiceTa
   const [loadingAi, setLoadingAi] = useState(false);
   const [copiedMsgId, setCopiedMsgId] = useState<string | null>(null);
   const [audioWaves, setAudioWaves] = useState<number[]>([20, 45, 75, 35, 90, 60, 40, 70, 30]);
+  const [micPermissionError, setMicPermissionError] = useState<string | null>(null);
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const recognitionRef = useRef<any>(null);
@@ -234,6 +237,11 @@ export default function AiVoiceTalkback({ contacts, onDraftToMailer }: AiVoiceTa
         recognition.onerror = (err: any) => {
           console.log('Speech recognition error:', err);
           setIsListening(false);
+          if (err.error === 'not-allowed' || err.error === 'permission-denied') {
+            setMicPermissionError(
+              'Microphone access is blocked by your browser settings. Please click the camera/mic icon in the browser address bar to allow microphone access, or type your query in the prompt box.'
+            );
+          }
         };
 
         recognition.onend = () => {
@@ -264,7 +272,7 @@ export default function AiVoiceTalkback({ contacts, onDraftToMailer }: AiVoiceTa
     setMessages((prev) => [...prev, langSwitchMsg]);
   };
 
-  const toggleMicListening = () => {
+  const toggleMicListening = async () => {
     if (isAiSpeaking) {
       stopAudio();
     }
@@ -277,13 +285,34 @@ export default function AiVoiceTalkback({ contacts, onDraftToMailer }: AiVoiceTa
     if (isListening) {
       recognitionRef.current.stop();
       setIsListening(false);
-    } else {
-      setIsListening(true);
-      try {
-        recognitionRef.current.start();
-      } catch (err) {
-        console.error('Error starting speech recognition:', err);
+      return;
+    }
+
+    // Try requesting user media audio permission first to prompt browser dialog
+    try {
+      if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        // Stop stream immediately since recognition will acquire its own stream
+        stream.getTracks().forEach((track) => track.stop());
+        setMicPermissionError(null);
       }
+    } catch (err: any) {
+      console.warn('Microphone permission request:', err);
+      if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+        setMicPermissionError(
+          'Microphone access is blocked by your browser settings. Please allow microphone access in your browser address bar or use text queries.'
+        );
+        return;
+      }
+    }
+
+    setMicPermissionError(null);
+    setIsListening(true);
+    try {
+      recognitionRef.current.start();
+    } catch (err) {
+      console.error('Error starting speech recognition:', err);
+      setIsListening(false);
     }
   };
 
@@ -666,6 +695,28 @@ export default function AiVoiceTalkback({ contacts, onDraftToMailer }: AiVoiceTa
               <Search className="w-3.5 h-3.5" /> Instant Lookup
             </div>
             <p className="text-[11px] opacity-75">Quick directory filtering and phone/email queries.</p>
+          </button>
+        </div>
+      )}
+
+      {/* MIC PERMISSION WARNING BANNER */}
+      {micPermissionError && (
+        <div className="p-3.5 sm:p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-900 dark:text-amber-200 text-xs flex items-start justify-between gap-3 shadow-sm">
+          <div className="flex items-start gap-2.5">
+            <AlertCircle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
+            <div className="space-y-1">
+              <p className="font-medium">{micPermissionError}</p>
+              <p className="text-[11px] opacity-80">
+                Tip: If running inside an embedded iframe preview, click the URL bar lock icon to allow microphone, or use the instant prompt box below.
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => setMicPermissionError(null)}
+            className="text-amber-500 hover:text-amber-700 dark:hover:text-amber-100 p-1"
+          >
+            <X className="w-4 h-4" />
           </button>
         </div>
       )}
