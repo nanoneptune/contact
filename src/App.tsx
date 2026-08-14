@@ -767,22 +767,9 @@ export default function App() {
             </div>
           )}
 
-          {/* VIEW: TELEGRAM BOT CONTACT SYNC */}
+          {/* VIEW: TELEGRAM BOT HUB */}
           {activeTab === 'telegram' && (
             <div className="space-y-4">
-              <div className="flex items-center justify-between border-b border-black/5 dark:border-white/5 pb-3">
-                <div className="meta-tag text-[#0088cc] flex items-center gap-1.5 font-geist-mono">
-                  <Send className="w-3.5 h-3.5 -rotate-45 text-[#0088cc]" />
-                  TELEGRAM CONTACT INGESTION ENGINE
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setActiveTab('saved')}
-                  className="text-xs font-geist-mono uppercase tracking-wider text-[#0088cc] hover:underline"
-                >
-                  ← Return to Directory
-                </button>
-              </div>
               <TelegramBotSync
                 existingContacts={contacts}
                 onContactsImported={(newlyImported) => {
