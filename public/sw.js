@@ -1,19 +1,27 @@
-// Service Worker for Contact Manager & Messaging Hub PWA
-const CACHE_NAME = 'contacts-pwa-v1';
-const STATIC_ASSETS = [
+// Service Worker for Contact Manager & Messaging Hub PWA (PWABuilder Compliant)
+const CACHE_NAME = 'contacts-pwa-v2';
+const OFFLINE_URL = '/offline.html';
+
+const PRECACHE_ASSETS = [
   '/',
   '/index.html',
+  '/offline.html',
   '/manifest.json',
   '/favicon.svg',
+  '/icons/apple-touch-icon.png',
   '/icons/icon-192.png',
-  '/icons/icon-512.png'
+  '/icons/icon-512.png',
+  '/icons/icon-maskable-192.png',
+  '/icons/icon-maskable-512.png',
+  '/icons/screenshot-desktop.png',
+  '/icons/screenshot-mobile.png'
 ];
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
-      return cache.addAll(STATIC_ASSETS).catch((err) => {
-        console.warn('Pre-caching warning:', err);
+      return cache.addAll(PRECACHE_ASSETS).catch((err) => {
+        console.warn('Precache warning:', err);
       });
     }).then(() => self.skipWaiting())
   );
@@ -39,35 +47,42 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
+  // Handle navigation requests
+  if (event.request.mode === 'navigate') {
+    event.respondWith(
+      fetch(event.request).catch(() => {
+        return caches.match(OFFLINE_URL);
+      })
+    );
+    return;
+  }
+
+  // Stale-while-revalidate for static assets
   event.respondWith(
     caches.match(event.request).then((cachedResponse) => {
       if (cachedResponse) {
-        // Fetch fresh copy in background (Stale-While-Revalidate)
         fetch(event.request).then((networkResponse) => {
           if (networkResponse && networkResponse.status === 200) {
             caches.open(CACHE_NAME).then((cache) => {
               cache.put(event.request, networkResponse);
             });
           }
-        }).catch(() => {
-          // Offline, use cached
-        });
+        }).catch(() => {});
         return cachedResponse;
       }
 
-      return fetch(event.request).then((response) => {
-        if (!response || response.status !== 200 || response.type !== 'basic') {
-          return response;
+      return fetch(event.request).then((networkResponse) => {
+        if (!networkResponse || networkResponse.status !== 200 || networkResponse.type !== 'basic') {
+          return networkResponse;
         }
-        const responseToCache = response.clone();
+        const responseToCache = networkResponse.clone();
         caches.open(CACHE_NAME).then((cache) => {
           cache.put(event.request, responseToCache);
         });
-        return response;
+        return networkResponse;
       }).catch(() => {
-        // If offline and requesting navigation, return index.html
-        if (event.request.mode === 'navigate') {
-          return caches.match('/index.html');
+        if (event.request.headers.get('accept')?.includes('text/html')) {
+          return caches.match(OFFLINE_URL);
         }
       });
     })

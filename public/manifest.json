@@ -1,20 +1,78 @@
 {
-  "id": "/?source=pwa",
+  "id": "/",
   "name": "Contact Manager & Messaging Hub",
   "short_name": "Contacts",
   "description": "Minimalist Ambient Contacts Directory with Markdown Mailer, Telegram Bot Sync, and AI Voice Talkback.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
-  "display_override": ["window-controls-overlay", "standalone", "minimal-ui", "browser"],
+  "display_override": [
+    "window-controls-overlay",
+    "standalone",
+    "minimal-ui",
+    "browser"
+  ],
   "orientation": "any",
+  "dir": "ltr",
+  "lang": "en-US",
   "background_color": "#fbfbfd",
   "theme_color": "#5e5ce6",
-  "lang": "en",
-  "dir": "auto",
-  "categories": ["productivity", "utilities", "business", "communication"],
+  "categories": [
+    "productivity",
+    "utilities",
+    "business",
+    "communication"
+  ],
   "prefer_related_applications": false,
+  "related_applications": [],
+  "iarc_rating_id": "e84b072d-71b3-4d3e-86ae-31a8ce4e53b7",
+  "handle_links": "preferred",
+  "launch_handler": {
+    "client_mode": [
+      "navigate-existing",
+      "auto"
+    ]
+  },
+  "edge_side_panel": {
+    "preferred_width": 400
+  },
   "icons": [
+    {
+      "src": "/icons/icon-48.png",
+      "sizes": "48x48",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-72.png",
+      "sizes": "72x72",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-96.png",
+      "sizes": "96x96",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-128.png",
+      "sizes": "128x128",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-144.png",
+      "sizes": "144x144",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-152.png",
+      "sizes": "152x152",
+      "type": "image/png",
+      "purpose": "any"
+    },
     {
       "src": "/icons/icon-192.png",
       "sizes": "192x192",
@@ -22,8 +80,26 @@
       "purpose": "any"
     },
     {
+      "src": "/icons/icon-256.png",
+      "sizes": "256x256",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-384.png",
+      "sizes": "384x384",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
       "src": "/icons/icon-512.png",
       "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-1024.png",
+      "sizes": "1024x1024",
       "type": "image/png",
       "purpose": "any"
     },
@@ -40,6 +116,12 @@
       "purpose": "maskable"
     },
     {
+      "src": "/icons/icon-maskable-1024.png",
+      "sizes": "1024x1024",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
       "src": "/favicon.svg",
       "sizes": "any",
       "type": "image/svg+xml",
@@ -48,32 +130,56 @@
   ],
   "shortcuts": [
     {
-      "name": "Directory",
+      "name": "Contact Directory",
       "short_name": "Directory",
-      "description": "View and manage contacts",
+      "description": "View and manage saved contacts and organizations",
       "url": "/?tab=saved",
-      "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }]
+      "icons": [
+        {
+          "src": "/icons/icon-192.png",
+          "sizes": "192x192",
+          "type": "image/png"
+        }
+      ]
     },
     {
       "name": "Markdown Mailer",
       "short_name": "Mailer",
-      "description": "Broadcast markdown email notices",
+      "description": "Broadcast markdown email notices and letters",
       "url": "/?tab=mailer",
-      "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }]
+      "icons": [
+        {
+          "src": "/icons/icon-192.png",
+          "sizes": "192x192",
+          "type": "image/png"
+        }
+      ]
     },
     {
-      "name": "Telegram Bot",
+      "name": "Telegram Bot Hub",
       "short_name": "Telegram",
-      "description": "Send bot notices & sync telegram contacts",
+      "description": "Send bot notices & sync Telegram contacts",
       "url": "/?tab=telegram",
-      "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }]
+      "icons": [
+        {
+          "src": "/icons/icon-192.png",
+          "sizes": "192x192",
+          "type": "image/png"
+        }
+      ]
     },
     {
       "name": "AI Voice Talkback",
       "short_name": "AI Voice",
-      "description": "Live AI conversational directory talkback",
+      "description": "Conversational live directory talkback assistant",
       "url": "/?tab=talkback",
-      "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }]
+      "icons": [
+        {
+          "src": "/icons/icon-192.png",
+          "sizes": "192x192",
+          "type": "image/png"
+        }
+      ]
     }
   ],
   "screenshots": [
@@ -82,14 +188,64 @@
       "sizes": "1280x720",
       "type": "image/png",
       "form_factor": "wide",
-      "label": "Contact Directory & Mailer Desktop View"
+      "label": "Contact Directory & Markdown Mailer Dashboard on Desktop"
     },
     {
       "src": "/icons/screenshot-mobile.png",
       "sizes": "750x1334",
       "type": "image/png",
       "form_factor": "narrow",
-      "label": "Contact Directory Mobile View"
+      "label": "Contacts Directory Mobile View"
+    }
+  ],
+  "share_target": {
+    "action": "/?action=share",
+    "method": "GET",
+    "params": {
+      "title": "title",
+      "text": "text",
+      "url": "url"
+    }
+  },
+  "file_handlers": [
+    {
+      "action": "/?action=import-vcf",
+      "name": "vCard Contacts",
+      "icons": [
+        {
+          "src": "/icons/icon-192.png",
+          "sizes": "192x192",
+          "type": "image/png"
+        }
+      ],
+      "accept": {
+        "text/vcard": [".vcf"],
+        "text/x-vcard": [".vcf"]
+      }
+    }
+  ],
+  "protocol_handlers": [
+    {
+      "protocol": "web+contact",
+      "url": "/?contact=%s"
+    }
+  ],
+  "widgets": [
+    {
+      "name": "Contacts Quick Glance",
+      "short_name": "Contacts",
+      "description": "Quick view of directory contacts and announcements",
+      "tag": "contacts-glance",
+      "ms_ac_template": "/widgets/template.json",
+      "data": "/api/contacts",
+      "type": "application/json",
+      "screenshots": [
+        {
+          "src": "/icons/screenshot-desktop.png",
+          "sizes": "1280x720",
+          "label": "Contacts Widget Preview"
+        }
+      ]
     }
   ]
 }
