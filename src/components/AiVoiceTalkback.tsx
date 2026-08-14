@@ -287,6 +287,95 @@ export default function AiVoiceTalkback({ contacts, onDraftToMailer }: AiVoiceTa
     }
   };
 
+  // Local intelligent fallback generator if server endpoint is unavailable
+  const generateLocalAiResponse = (query: string, lang: SupportedLanguage): { reply: string; draft?: { subject?: string; body?: string } } => {
+    const q = query.toLowerCase();
+    const contactCount = contacts.length;
+    const emailable = contacts.filter((c) => c.email && c.email.includes('@'));
+
+    // Check if user is asking to draft an email
+    if (q.includes('draft') || q.includes('email') || q.includes('mail') || q.includes('ಇಮೇಲ್') || q.includes('ಈಮೇಲ್') || q.includes('ईमेल')) {
+      if (lang === 'kn-IN') {
+        const subject = 'ಸಂಪರ್ಕ ನವೀಕರಣ ಮತ್ತು ಶುಭಾಶಯಗಳು';
+        const body = `### ನಮಸ್ಕಾರ,\n\nಇದು ಸಂಪರ್ಕ ಆಪ್ ಮೂಲಕ ಕಳುಹಿಸಲಾದ ಪ್ರಮುಖ ಸಂದೇಶವಾಗಿದೆ.\n\n- **ವಿಷಯ:** ನಿಯಮಿತ ಸಂಪರ್ಕ ನವೀಕರಣ\n- **ದಿನಾಂಕ:** ${new Date().toLocaleDateString('kn-IN')}\n\nಧನ್ಯವಾದಗಳು,\n*ಸಂಪರ್ಕ ವ್ಯವಸ್ಥಾಪಕ ತಂಡ*`;
+        return {
+          reply: `ಖಂಡಿತ! ನಿಮಗಾಗಿ ಇಮೇಲ್ ಡ್ರಾಫ್ಟ್ ಸಿದ್ಧಪಡಿಸಲಾಗಿದೆ:\n\n**ವಿಷಯ:** ${subject}\n\n${body}`,
+          draft: { subject, body },
+        };
+      } else if (lang === 'hi-IN') {
+        const subject = 'संपर्क अपडेट और शुभकामनाएं';
+        const body = `### नमस्ते,\n\nयह संपर्क ऐप के माध्यम से भेजा गया एक महत्वपूर्ण संदेश है।\n\n- **विषय:** नियमित संपर्क अपडेट\n- **तारीख:** ${new Date().toLocaleDateString('hi-IN')}\n\nधन्यवाद,\n*संपर्क प्रबंधन टीम*`;
+        return {
+          reply: `ज़रूर! आपके लिए ईमेल ड्राफ्ट तैयार किया गया है:\n\n**विषय:** ${subject}\n\n${body}`,
+          draft: { subject, body },
+        };
+      } else {
+        const subject = 'Important Directory & Contact Update';
+        const body = `### Hello,\n\nThis is an automated communication from your Contacts & Mailer assistant.\n\n- **Subject:** Directory Update & Announcements\n- **Date:** ${new Date().toLocaleDateString()}\n\nBest regards,\n*Contacts Management Team*`;
+        return {
+          reply: `Here is your drafted email message ready for review:\n\n**Subject:** ${subject}\n\n${body}`,
+          draft: { subject, body },
+        };
+      }
+    }
+
+    // Check for contact list / summary
+    if (q.includes('list') || q.includes('all') || q.includes('summar') || q.includes('ಎಲ್ಲಾ') || q.includes('ಪಟ್ಟಿ') || q.includes('सूची') || q.includes('सभी')) {
+      if (contactCount === 0) {
+        return {
+          reply: lang === 'kn-IN' ? 'ನಿಮ್ಮ ಡೈರೆಕ್ಟರಿಯಲ್ಲಿ ಇನ್ನೂ ಯಾವುದೇ ಸಂಪರ್ಕಗಳು ಉಳಿಸಿಲ್ಲ.' : lang === 'hi-IN' ? 'आपकी डायरेक्टरी में अभी कोई संपर्क सेव नहीं है।' : 'You do not have any saved contacts in your directory yet.',
+        };
+      }
+
+      const listItems = contacts.slice(0, 8).map((c) => `• **${c.name}** (${c.place}) - ${c.phone}${c.email ? ` | ✉️ ${c.email}` : ''}`).join('\n');
+      if (lang === 'kn-IN') {
+        return {
+          reply: `ನಿಮ್ಮ ಬಳಿ ಒಟ್ಟು **${contactCount}** ಸಂಪರ್ಕಗಳಿವೆ:\n\n${listItems}\n\nನೀವು ಇವುಗಳಲ್ಲಿ ಯಾರಿಗಾದರೂ ಇಮೇಲ್ ಕಳುಹಿಸಲು ಬಯಸುತ್ತೀರಾ?`,
+        };
+      } else if (lang === 'hi-IN') {
+        return {
+          reply: `आपके पास कुल **${contactCount}** संपर्क सुरक्षित हैं:\n\n${listItems}\n\nक्या आप इनमें से किसी को ईमेल भेजना चाहते हैं?`,
+        };
+      } else {
+        return {
+          reply: `You have **${contactCount}** contacts saved in your directory:\n\n${listItems}\n\nWould you like me to draft an email to any of these contacts?`,
+        };
+      }
+    }
+
+    // Check for email contacts inquiry
+    if (q.includes('email ready') || q.includes('who has email') || q.includes('ಇಮೇಲ್ ಇರುವವರು') || q.includes('ईमेल वाले')) {
+      if (emailable.length === 0) {
+        return {
+          reply: lang === 'kn-IN' ? 'ಯಾವುದೇ ಸಂಪರ್ಕಕ್ಕೆ ಇಮೇಲ್ ವಿಳಾಸ ಸೇರಿಸಲಾಗಿಲ್ಲ.' : lang === 'hi-IN' ? 'किसी भी संपर्क के पास ईमेल एड्रेस नहीं है।' : 'None of your saved contacts currently have an email address configured.',
+        };
+      }
+      const emailList = emailable.map((c) => `• **${c.name}**: ${c.email}`).join('\n');
+      if (lang === 'kn-IN') {
+        return { reply: `ಇಮೇಲ್ ವಿಳಾಸ ಹೊಂದಿರುವ **${emailable.length}** ಸಂಪರ್ಕಗಳು:\n\n${emailList}` };
+      } else if (lang === 'hi-IN') {
+        return { reply: `ईमेल एड्रेस वाले **${emailable.length}** संपर्क:\n\n${emailList}` };
+      } else {
+        return { reply: `Found **${emailable.length}** contacts configured with email addresses:\n\n${emailList}` };
+      }
+    }
+
+    // Default conversational reply
+    if (lang === 'kn-IN') {
+      return {
+        reply: `ನಮಸ್ಕಾರ! ನಿಮ್ಮ ಡೈರೆಕ್ಟರಿಯಲ್ಲಿ **${contactCount}** ಸಂಪರ್ಕಗಳಿವೆ. ನಾನು ನಿಮಗೆ ಸಂಪರ್ಕಗಳ ಪಟ್ಟಿ, ಶೋಧನೆ ಅಥವಾ ಇಮೇಲ್ ಡ್ರಾಫ್ಟ್ ರಚಿಸಲು ಸಹಾಯ ಮಾಡಬಲ್ಲೆ. ನೀವು ಏನು ತಿಳಿಯಲು ಬಯಸುತ್ತೀರಿ?`,
+      };
+    } else if (lang === 'hi-IN') {
+      return {
+        reply: `नमस्ते! आपकी डायरेक्टरी में **${contactCount}** संपर्क सेव हैं। मैं संपर्क खोजने, सारांश देने या ईमेल ड्राफ्ट करने में आपकी सहायता कर सकता हूं।`,
+      };
+    } else {
+      return {
+        reply: `Hello! You currently have **${contactCount}** saved contacts (${emailable.length} with emails). I can help you search records, summarize cities, or compose custom Markdown emails. How can I assist you?`,
+      };
+    }
+  };
+
   const handleSendMessage = async (textToSend?: string) => {
     const query = (textToSend || inputPrompt).trim();
     if (!query || loadingAi) return;
@@ -312,34 +401,44 @@ export default function AiVoiceTalkback({ contacts, onDraftToMailer }: AiVoiceTa
         content: m.text,
       }));
 
-      const res = await fetch('/api/ai-chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          userMessage: query,
-          contacts,
-          history: historyFormatted,
-          languageCode: selectedLang,
-          mode: activeMode,
-        }),
-      });
-
       let replyText = '';
       let replySource = 'groq';
-      const contentType = res.headers.get('content-type');
+      let emailDraft: { subject?: string; body?: string } | null = null;
 
-      if (contentType && contentType.includes('application/json')) {
-        const data = await res.json();
-        replyText = data.reply || data.error || "I've processed your request.";
-        replySource = data.source || 'groq';
-      } else {
-        const textBody = await res.text();
-        console.warn('Non-JSON response received:', textBody.slice(0, 100));
-        replyText = `Hello! I am your AI Assistant. You have ${contacts?.length || 0} saved contact${contacts?.length === 1 ? '' : 's'}. How can I assist you today?`;
-        replySource = 'offline';
+      try {
+        const res = await fetch('/api/ai-chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            userMessage: query,
+            contacts,
+            history: historyFormatted,
+            languageCode: selectedLang,
+            mode: activeMode,
+          }),
+        });
+
+        if (res.ok) {
+          const data = await res.json();
+          replyText = data.reply || data.error;
+          replySource = data.source || 'groq';
+        } else {
+          // If server returned 404 or error status, use smart local engine
+          const localResult = generateLocalAiResponse(query, selectedLang);
+          replyText = localResult.reply;
+          emailDraft = localResult.draft || null;
+          replySource = 'local-engine';
+        }
+      } catch {
+        const localResult = generateLocalAiResponse(query, selectedLang);
+        replyText = localResult.reply;
+        emailDraft = localResult.draft || null;
+        replySource = 'local-engine';
       }
 
-      const emailDraft = extractEmailDraftFromText(replyText);
+      if (!emailDraft) {
+        emailDraft = extractEmailDraftFromText(replyText);
+      }
 
       const aiMsg: ChatMessage = {
         id: `ai-${Date.now()}`,
@@ -357,13 +456,18 @@ export default function AiVoiceTalkback({ contacts, onDraftToMailer }: AiVoiceTa
       }
     } catch (err) {
       console.error('AI Chat Error:', err);
-      const errorMsg: ChatMessage = {
-        id: `err-${Date.now()}`,
+      const localResult = generateLocalAiResponse(query, selectedLang);
+      const fallbackMsg: ChatMessage = {
+        id: `fb-${Date.now()}`,
         sender: 'ai',
-        text: "I couldn't reach the AI server right now. Let me know if you need help viewing saved contacts!",
+        text: localResult.reply,
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        emailDraft: localResult.draft || undefined,
       };
-      setMessages((prev) => [...prev, errorMsg]);
+      setMessages((prev) => [...prev, fallbackMsg]);
+      if (autoTalkback) {
+        fallbackWebSpeech(localResult.reply);
+      }
     } finally {
       setLoadingAi(false);
     }
