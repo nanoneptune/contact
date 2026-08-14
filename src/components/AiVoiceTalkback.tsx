@@ -434,6 +434,7 @@ export default function AiVoiceTalkback({ contacts, onDraftToMailer }: AiVoiceTa
       let replySource = 'groq';
       let emailDraft: { subject?: string; body?: string } | null = null;
 
+      // Try 1: Call /api/ai-chat endpoint (Express or Vercel serverless function)
       try {
         const res = await fetch('/api/ai-chat', {
           method: 'POST',
@@ -447,23 +448,101 @@ export default function AiVoiceTalkback({ contacts, onDraftToMailer }: AiVoiceTa
           }),
         });
 
-        if (res.ok) {
+        const contentType = res.headers.get('content-type');
+        if (res.ok && contentType && contentType.includes('application/json')) {
           const data = await res.json();
-          replyText = data.reply || data.error;
-          replySource = data.source || 'groq';
-        } else {
-          // If server returned 404 or error status, use smart local engine
-          const localResult = generateLocalAiResponse(query, selectedLang);
-          replyText = localResult.reply;
-          emailDraft = localResult.draft || null;
-          replySource = 'local-engine';
+          if (data.reply) {
+            replyText = data.reply;
+            replySource = data.source || 'groq';
+          }
         }
-      } catch {
+      } catch (endpointErr) {
+        console.warn('Endpoint /api/ai-chat unreachable, attempting direct Groq API...', endpointErr);
+      }
+
+      // Try 2: Direct Groq API call (works on Vercel static deployments & client-side)
+      if (!replyText) {
+        try {
+          const groqKey =
+            (import.meta.env.VITE_GROQ_API_KEY as string)?.trim() ||
+            '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';
+
+          const formattedContacts =
+            Array.isArray(contacts) && contacts.length > 0
+              ? contacts
+                  .map(
+                    (c: any) =>
+                      `- Name: ${c.name}, Phone: ${c.phone}, Place: ${c.place}, Email: ${c.email || 'N/A'}`
+                  )
+                  .join('\n')
+              : 'No contacts currently saved.';
+
+          let languageInstruction = 'Respond in clear, natural English.';
+          if (selectedLang === 'kn-IN') {
+            languageInstruction =
+              'CRITICAL: Respond strictly in Kannada script (ಕನ್ನಡ) so the Sarvam AI Kannada TTS engine can speak it natively aloud to the user.';
+          } else if (selectedLang === 'hi-IN') {
+            languageInstruction =
+              'CRITICAL: Respond strictly in Hindi script (हिंदी) so the Sarvam AI Hindi TTS engine can speak it natively aloud to the user.';
+          } else if (selectedLang === 'en-IN') {
+            languageInstruction =
+              'Respond in clear English suitable for Indian English speech synthesis.';
+          }
+
+          const systemPrompt = `You are "AI Voice Talkback", an intelligent, courteous AI assistant for the Contacts & Messaging App.
+Your goal is to greet the user politely, organize conversations clearly, provide helpful information based on the user's saved contacts or general questions, and format your output so it sounds natural when spoken aloud.
+
+LANGUAGE MANDATE:
+${languageInstruction}
+
+SAVED CONTACTS CONTEXT:
+${formattedContacts}
+
+INSTRUCTIONS:
+1. Greet the user warmly in the target language when appropriate.
+2. Provide direct, organized answers (e.g. if asked about contacts, list their details clearly).
+3. Keep answers conversational, crisp, and under 120 words so they sound great over speech synthesis / talkback.
+4. Avoid markdown heavy tables or code blocks unless requested.`;
+
+          const groqRes = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+              Authorization: `Bearer ${groqKey}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              model: 'llama-3.3-70b-versatile',
+              messages: [
+                { role: 'system', content: systemPrompt },
+                ...historyFormatted,
+                { role: 'user', content: query },
+              ],
+              temperature: 0.7,
+              max_tokens: 400,
+            }),
+          });
+
+          if (groqRes.ok) {
+            const data = await groqRes.json();
+            const groqReply = data.choices?.[0]?.message?.content;
+            if (groqReply && groqReply.trim()) {
+              replyText = groqReply.trim();
+              replySource = 'groq-direct';
+            }
+          }
+        } catch (directGroqErr) {
+          console.warn('Direct Groq API call failed:', directGroqErr);
+        }
+      }
+
+      // Try 3: Intelligent local context generator
+      if (!replyText) {
         const localResult = generateLocalAiResponse(query, selectedLang);
         replyText = localResult.reply;
         emailDraft = localResult.draft || null;
         replySource = 'local-engine';
       }
+
 
       if (!emailDraft) {
         emailDraft = extractEmailDraftFromText(replyText);
@@ -505,26 +584,89 @@ export default function AiVoiceTalkback({ contacts, onDraftToMailer }: AiVoiceTa
   const speakResponseSarvam = async (text: string) => {
     try {
       setIsAiSpeaking(true);
-      const res = await fetch('/api/sarvam-tts', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          text,
-          languageCode: selectedLang,
-        }),
-      });
+      let audioBase64: string | null = null;
 
-      const contentType = res.headers.get('content-type');
-      let data: any = {};
-      if (contentType && contentType.includes('application/json')) {
-        data = await res.json();
+      // 1. Try /api/sarvam-tts endpoint (Express or Vercel serverless function)
+      try {
+        const res = await fetch('/api/sarvam-tts', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            text,
+            languageCode: selectedLang,
+          }),
+        });
+
+        const contentType = res.headers.get('content-type');
+        if (res.ok && contentType && contentType.includes('application/json')) {
+          const data = await res.json();
+          if (data.audioBase64) {
+            audioBase64 = data.audioBase64;
+          }
+        }
+      } catch (endpointErr) {
+        console.warn('Endpoint /api/sarvam-tts unreachable, trying direct Sarvam API...', endpointErr);
       }
 
-      if (res.ok && data.audioBase64) {
+      // 2. Direct Sarvam API call (works on Vercel static deployments & client-side)
+      if (!audioBase64) {
+        try {
+          const sarvamKey =
+            (import.meta.env.VITE_SARVAM_API_KEY as string)?.trim() ||
+            'sk_sugpmk4r_XFuBU2y16WzaWQPCSxp7tHKb';
+          const cleanText = text.replace(/[*#_`]/g, '').trim().slice(0, 500);
+
+          let sarvamRes = await fetch('https://api.sarvam.ai/text-to-speech', {
+            method: 'POST',
+            headers: {
+              'api-subscription-key': sarvamKey,
+              Authorization: `Bearer ${sarvamKey}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              inputs: [cleanText],
+              target_language_code: selectedLang,
+              speaker: selectedLang === 'kn-IN' ? 'anushka' : 'ritu',
+              pace: speechSpeed,
+              model: 'bulbul:v3',
+            }),
+          });
+
+          if (!sarvamRes.ok) {
+            sarvamRes = await fetch('https://api.sarvam.ai/text-to-speech', {
+              method: 'POST',
+              headers: {
+                'api-subscription-key': sarvamKey,
+                Authorization: `Bearer ${sarvamKey}`,
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                inputs: [cleanText],
+                target_language_code: selectedLang,
+                speaker: 'anushka',
+                pace: speechSpeed,
+                model: 'bulbul:v2',
+              }),
+            });
+          }
+
+          if (sarvamRes.ok) {
+            const data = await sarvamRes.json();
+            if (Array.isArray(data.audios) && data.audios[0]) {
+              audioBase64 = `data:audio/wav;base64,${data.audios[0]}`;
+            }
+          }
+        } catch (directSarvamErr) {
+          console.warn('Direct Sarvam API call failed:', directSarvamErr);
+        }
+      }
+
+      // 3. Play Sarvam audio if acquired, otherwise fallback to WebSpeech
+      if (audioBase64) {
         if (audioRef.current) {
           audioRef.current.pause();
         }
-        const audio = new Audio(data.audioBase64);
+        const audio = new Audio(audioBase64);
         audio.playbackRate = speechSpeed;
         audioRef.current = audio;
 
